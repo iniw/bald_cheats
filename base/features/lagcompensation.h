@@ -11,8 +11,6 @@
 #include "../sdk/interfaces/inetchannel.h"
 // used: ConVar interface
 #include "../core/interfaces.h"
-// used: GetBestTarget()
-#include "legitbot.h"
 
 #pragma region lagcompensation_definitions
 #define LAG_COMPENSATION_TELEPORTED_DISTANCE_SQR ( 64.0f * 64.0f )
@@ -68,10 +66,26 @@ private:
 struct Record_t
 {
 	float flSimtime;
+	Vector vecHitboxPos;
 	Vector vecHeadPos;
 	Vector vecOrigin;
-	studiohdr_t* pModel;
+	Vector vecAbsOrigin;
+	Vector vecMins;
+	Vector vecMaxs;
+	Vector vecViewOffset;
+	//QAngle angAbsAngles;
 	std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix;
+};
+
+struct OriginalData_t
+{
+	float flSimtime;
+	Vector vecOrigin;
+	Vector vecAbsOrigin;
+	Vector vecMins;
+	Vector vecMaxs;
+	Vector vecViewOffset;
+	//QAngle angAbsAngles;
 };
 
 class CBacktracking : public CSingleton<CBacktracking>
@@ -79,17 +93,19 @@ class CBacktracking : public CSingleton<CBacktracking>
 public:
 	void Run(CUserCmd* pCmd, CBaseEntity* pLocal);
 	void Update(CBaseEntity* pLocal);
-	void Init();
-	float GetLerp();
 	std::deque<Record_t> GetPlayerRecord(int iIndex);
-	int GetBestRecord(CBaseEntity* pLocal, QAngle angViewangles, int iIndex);
+	void ApplyData(Record_t record, CBaseEntity* pEntity);
+	void RestoreData(CBaseEntity* pEntity);
+	float GetLerp();
+	bool IsValid(float flSimtime, CBaseEntity* pLocal);
+	std::array<std::deque<Record_t>, 65> m_arrRecords;
 
 private:
-	bool IsValid(float flSimtime, CBaseEntity* pLocal);
 	bool IsValid(CBaseEntity* pLocal, CBaseEntity* pEntity);
-	void DrawPill(std::array<matrix3x4_t, MAXSTUDIOBONES> arrBonesToWorld, studiohdr_t* pModel, Color colPrimary, float flDuration);
 	CBaseEntity* GetBestEntity(CBaseEntity* pLocal);
+	Vector GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix);
 
+	OriginalData_t m_orgData;
 	CConVar* m_cl_updaterate;
 	CConVar* m_sv_minupdaterate;
 	CConVar* m_sv_maxupdaterate;
@@ -98,6 +114,4 @@ private:
 	CConVar* m_sv_client_min_interp_ratio;
 	CConVar* m_sv_client_max_interp_ratio;
 	CConVar* m_sv_maxunlag;
-
-	std::array<std::deque<Record_t>, 65> m_arrRecords;
 };

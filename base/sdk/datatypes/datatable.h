@@ -18,6 +18,7 @@ enum ESendPropType
 struct RecvProp_t;
 struct DataVariant_t
 {
+public:
 	union
 	{
 		float	Float;

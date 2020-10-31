@@ -22,8 +22,6 @@
 #include <comdef.h>
 #include "../utilities/logging.h"
 
-#include "lagcompensation.h"
-
 // @note: avoid store imcolor, store either u32 of imvec4
 void CVisuals::Store()
 {

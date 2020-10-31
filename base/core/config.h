@@ -18,7 +18,7 @@
 #pragma region config_definitions
 #define C_ADD_VARIABLE( Type, szName, pDefault ) const std::uint32_t szName = C::AddVariable<Type>(FNV1A::HashConst(#szName), FNV1A::HashConst(#Type), pDefault);
 #define C_ADD_VARIABLE_VECTOR( Type, uSize, szName, pDefault ) const std::uint32_t szName = C::AddVariable<std::vector<Type>>(FNV1A::HashConst(#szName), FNV1A::HashConst("std::vector<" #Type ">"), MEM::GetFilledVector<Type, uSize>(pDefault));
-#define C_ADD_VARIABLE_MAP( Type1, Type2, uSize, szName, pDefault1, pDefault2) const std::uint32_t szName = C::AddVariable<std::map<Type1, Type2>>(FNV1A::HashConst(#szName), FNV1A::HashConst("std::map<" #Type1 ", " #Type2 ">"), MEM::GetFilledMap<Type1, Type2, uSize>(pDefault1, pDefault2));
+#define C_ADD_VARIABLE_MAP( Type1, Type2, uSize, szName, pDefault1, pDefault2) const std::uint32_t szName = C::AddVariable<std::map<Type1, Type2>>(FNV1A::HashConst(#szName), FNV1A::HashConst("std::map<" #Type1"," #Type2 ">"), MEM::GetFilledMap<Type1, Type2, uSize>(pDefault1, pDefault2));
 #define C_GET_LEGITVAR( szName ) C::Get<std::vector<LegitbotVariables_t>>(Vars.vecLegitVars)[m_iWeaponType].##szName
 #define C_GET_LEGITVAR_TYPE( iWeaponType, szName ) C::Get<std::vector<LegitbotVariables_t>>(Vars.vecLegitVars)[##iWeaponType].##szName
 #define C_INVALID_VARIABLE (std::size_t)-1

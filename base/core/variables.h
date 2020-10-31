@@ -96,20 +96,22 @@ enum class EVisualsViewModelChams : int
 
 struct LegitbotVariables_t
 {
-	int iAimKey = 0;
-	float flAimFov = 0.0f;
-	int iAimHitbox = 0;
-	bool bAimSilent = false;
-	float flAimSmooth = 1.0f;
-	bool bAimRCS = false;
-	bool bAimAutoWall = false;
-	int iAimAutoWallMinDamage = 0;
+	int		iAimKey	= 0;
+	float	flAimFov = 0.0f;
+	int		iAimHitbox = 0;
+	bool	bAimAtBacktrack = false;
+	bool	bAimSilent = false;
+	float	flAimSmooth = 1.0f;
+	bool	bAimRCS = false;
+	bool	bAimAutoWall = false;
+	int		iAimAutoWallMinDamage = 0;
 
 	LegitbotVariables_t()
 	{
 		iAimKey = 0;
 		flAimFov = 0.0f;
 		iAimHitbox = 0;
+		bAimAtBacktrack = false;
 		bAimSilent = false;
 		flAimSmooth = 1.0f;
 		bAimRCS = false;
@@ -120,33 +122,33 @@ struct LegitbotVariables_t
 
 struct SkinchangerVariables_t
 {
-	bool bEnabled = false;
-	int iFallbackPaintKit = 0;
-	int iFallbackSeed = 0;
-	bool bStatTrak = false;
-	int iFallbackStatTrak = 0;
-	int iQuality = 4;
-	bool bCustomName = false;
-	std::string szCustomName = "";
-	float flFallbackWear = 0.1f;
-	short nDefinitionIndex = 0;
-	int iPaintKitVectorIndex = 0;
-	int iDefinitionOverrideIndex = 0;
+	bool		bEnabled = false;
+	int			iPaintKit = 0;
+	int			iPaintKitIndex = 0;
+	int			iSeed = 0;
+	bool		bStatTrak = false;
+	int			iStatTrak = 0;
+	int			iQuality = 0;
+	bool		bNameTag = false;
+	std::string szNameTag = "";
+	float		flWear = 0.1f;
+	int			iDefinitionIndex = 0;
+	int			iDefinitionIndexOverride = 0;
 
 	SkinchangerVariables_t()
 	{
 		bEnabled = false;
-		iFallbackPaintKit = 0;
-		iFallbackSeed = 0;
+		iPaintKit = 0;
+		iPaintKitIndex = 0;
+		iSeed = 0;
 		bStatTrak = false;
-		iFallbackStatTrak = 0;
-		iQuality = 4;
-		bCustomName = false;
-		szCustomName = "";
-		flFallbackWear = 0.1f;
-		nDefinitionIndex = 0;
-		iPaintKitVectorIndex = 0;
-		iDefinitionOverrideIndex = 0;
+		iStatTrak = 0;
+		iQuality = 0;
+		bNameTag = false;
+		szNameTag = "";
+		flWear = 0.1f;
+		iDefinitionIndex = 0;
+		iDefinitionIndexOverride = 0;
 	}
 };
 
@@ -330,6 +332,14 @@ struct Variables_t
 	C_ADD_VARIABLE(bool, bMiscUnlockInventory, false);
 	C_ADD_VARIABLE(bool, bMiscAntiUntrusted, true);
 	#pragma endregion
+
+	#pragma region variables_skinchanger
+	C_ADD_VARIABLE(int, iSkinchangerWeapon, 0);
+	C_ADD_VARIABLE(int, iSkinchangerKnife, 0);
+	C_ADD_VARIABLE(int, iSkinchangerGlove, 0);
+	C_ADD_VARIABLE(int, iSkinchangerPaintKit, 0);
+	//C_ADD_VARIABLE_MAP(int, SkinchangerVariables_t, MAX_WEAPONS, mapSkinchangerVars, 0, SkinchangerVariables_t());
+#pragma endregion
 
 	#pragma region variables_menu
 	C_ADD_VARIABLE(int, iMenuKey, VK_INSERT);

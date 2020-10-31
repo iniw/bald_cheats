@@ -69,6 +69,8 @@ namespace U
 	IClientNetworkable* CreateDLLEntity(int iEntity, EClassIndex nClassID, int nSerial);
 	/* returns icon of given index for custom font */
 	const char* GetWeaponIcon(short nItemDefinitionIndex);
+	/* lenght of a utf-8 encoded string */
+	int UTF8Len(char szFirstByte);
 
 	// Extra
 	/* flashes the specified window */

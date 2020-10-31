@@ -1,3 +1,5 @@
+// used: GetBestTarget()
+#include "legitbot.h"
 #include "lagcompensation.h"
 
 // used: globals interface
@@ -73,22 +75,16 @@ void CBacktracking::Run(CUserCmd* pCmd, CBaseEntity* pLocal)
 
 	if (pEntity == nullptr)
 		return;
-
+	/*
 	int iIndex = pEntity->GetIndex();
 
-	int iBestIndex = GetBestRecord(pLocal, angViewPoint, iIndex);
-
-	if (iBestIndex == -1)
-		return;
-
-	const Record_t& recRecord = m_arrRecords[iIndex][iBestIndex];
 	Vector vecOldAbsOrigin = pEntity->GetAbsOrigin();
 
 	if (pCmd->iButtons & IN_ATTACK)
 	{
-		pEntity->SetAbsOrigin(recRecord.vecOrigin);
-		pCmd->iTickCount = TIME_TO_TICKS(recRecord.flSimtime + GetLerp());
+		pCmd->iTickCount = TIME_TO_TICKS(record.flSimtime + GetLerp());
 	}
+	*/
 }
 
 void CBacktracking::Update(CBaseEntity* pLocal)
@@ -100,6 +96,15 @@ void CBacktracking::Update(CBaseEntity* pLocal)
 
 		return;
 	}
+
+	m_cl_updaterate = I::ConVar->FindVar("cl_updaterate");
+	m_sv_minupdaterate = I::ConVar->FindVar("sv_minupdaterate");
+	m_sv_maxupdaterate = I::ConVar->FindVar("sv_maxupdaterate");
+	m_cl_interp = I::ConVar->FindVar("cl_interp");
+	m_cl_interp_ratio = I::ConVar->FindVar("cl_interp_ratio");
+	m_sv_client_min_interp_ratio = I::ConVar->FindVar("sv_client_min_interp_ratio");
+	m_sv_client_max_interp_ratio = I::ConVar->FindVar("sv_client_max_interp_ratio");
+	m_sv_maxunlag = I::ConVar->FindVar("sv_maxunlag");
 
 	for (int i = 1; i <= I::Globals->nMaxClients; i++)
 	{
@@ -124,17 +129,28 @@ void CBacktracking::Update(CBaseEntity* pLocal)
 		if (!pEntity->SetupBones(recRecord.arrMatrix.data(), MAXSTUDIOBONES, BONE_USED_BY_HITBOX, I::Globals->flCurrentTime))
 			continue;
 
-		recRecord.pModel = I::ModelInfo->GetStudioModel(pEntity->GetModel());
-		recRecord.flSimtime = pEntity->GetSimulationTime();
-		recRecord.vecOrigin = pEntity->GetOrigin();
-		recRecord.vecHeadPos = pEntity->GetHitboxPosition(HITBOX_HEAD);
+		recRecord.vecHitboxPos	= GetBestHitbox(pLocal, pEntity, recRecord.arrMatrix);
+		recRecord.flSimtime		= pEntity->GetSimulationTime();
+		recRecord.vecOrigin		= pEntity->GetOrigin();
+		recRecord.vecAbsOrigin	= pEntity->GetAbsOrigin();
+		recRecord.vecHeadPos	= pEntity->GetHitboxPosition(HITBOX_HEAD, recRecord.arrMatrix);
+		recRecord.vecMins		= pEntity->GetVecMins();
+		recRecord.vecMaxs		= pEntity->GetVecMaxs();
+		//recRecord.angAbsAngles	= pEntity->GetAbsAngles();
+		recRecord.vecViewOffset = pEntity->GetViewOffset();
 
 		m_arrRecords[i].push_front(recRecord);
 
-		if (auto invalid = std::find_if(std::cbegin(m_arrRecords[i]), std::cend(m_arrRecords[i]), [&](const Record_t& rec) { return !CBacktracking::Get().IsValid(rec.flSimtime, pLocal); }); invalid != std::cend(m_arrRecords[i]))
-			m_arrRecords[i].erase(invalid, std::cend(m_arrRecords[i]));
+		if (auto invalid = std::find_if(std::cbegin(m_arrRecords[i]), std::cend(m_arrRecords[i]), 
+			[&](const Record_t& rec) 
+			{ 
+				return !CBacktracking::Get().IsValid(rec.flSimtime, pLocal); 
+			}); 
+			invalid != std::cend(m_arrRecords[i]))
 
-		while (m_arrRecords[i].size() > std::floor(TIME_TO_TICKS(C::Get<int>(Vars.iBacktrackingTime) / 1000.f)))
+		m_arrRecords[i].erase(invalid, std::cend(m_arrRecords[i]));
+
+		while (m_arrRecords[i].size() > std::clamp(TIME_TO_TICKS(C::Get<int>(Vars.iBacktrackingTime) / 1000.f), 0, 12))
 			m_arrRecords[i].pop_back();
 	}
 }
@@ -182,18 +198,6 @@ bool CBacktracking::IsValid(float flSimtime, CBaseEntity* pLocal)
 		return false;
 
 	return std::abs(flDeltaTime) <= 0.2f;	
-}
-
-void CBacktracking::Init()
-{
-	m_cl_updaterate = I::ConVar->FindVar("cl_updaterate");
-	m_sv_minupdaterate = I::ConVar->FindVar("sv_minupdaterate");
-	m_sv_maxupdaterate = I::ConVar->FindVar("sv_maxupdaterate");
-	m_cl_interp = I::ConVar->FindVar("cl_interp");
-	m_cl_interp_ratio = I::ConVar->FindVar("cl_interp_ratio");
-	m_sv_client_min_interp_ratio = I::ConVar->FindVar("sv_client_min_interp_ratio");
-	m_sv_client_max_interp_ratio = I::ConVar->FindVar("sv_client_max_interp_ratio");
-	m_sv_maxunlag = I::ConVar->FindVar("sv_maxunlag");
 }
 
 bool CBacktracking::IsValid(CBaseEntity* pLocal, CBaseEntity* pEntity)
@@ -250,29 +254,61 @@ CBaseEntity* CBacktracking::GetBestEntity(CBaseEntity* pLocal)
 	return pBestEntity;
 }
 
-int CBacktracking::GetBestRecord(CBaseEntity* pLocal, QAngle angViewangles, int iIndex)
+Vector CBacktracking::GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix)
 {
-	float flBestDelta = std::numeric_limits<float>::max();
-	int iBestIndex = -1;
+	float iBestDelta = std::numeric_limits<float>::max();
+	int iWeaponType = CLegitBot::Get().GetWeaponType(pLocal);
 
-	for (size_t i = 0; i < m_arrRecords[iIndex].size(); i++)
+	if ((C_GET_LEGITVAR_TYPE(iWeaponType, iAimHitbox) == (int)ELegitHitboxes::CLOSEST))
 	{
-		const Record_t& recRecord = m_arrRecords[iIndex][i];
+		Vector vecBestHitboxPos{ };
 
-		if (!IsValid(recRecord.flSimtime, pLocal))
-			continue;
-
-		QAngle angAngle = M::CalcAngle(pLocal->GetEyePosition(), recRecord.vecHeadPos).Clamped();
-		float flDelta = (angAngle - angViewangles).Length();
-
-		if (flDelta < flBestDelta)
+		for (int i = 0; i < CLegitBot::Get().m_arrClosestHitboxes.size(); i++)
 		{
-			flBestDelta = flDelta;
-			iBestIndex = i;
-		}
-	}
+			Vector vecHitboxPos = pEntity->GetHitboxPosition(CLegitBot::Get().m_arrClosestHitboxes.at(i), arrCustomMatrix);
+			QAngle angAngle = M::CalcAngle(pLocal->GetEyePosition(), vecHitboxPos).Clamped();
+			float flDelta = (angAngle - I::Engine->GetViewAngles()).Length();
 
-	return iBestIndex;
+			if (flDelta < iBestDelta)
+			{
+				vecBestHitboxPos = vecHitboxPos;
+				iBestDelta = flDelta;
+			}
+		}
+
+		return vecBestHitboxPos;
+	}
+	else
+		return pEntity->GetHitboxPosition(CLegitBot::Get().m_arrHitboxes.at((C_GET_LEGITVAR_TYPE(iWeaponType, iAimHitbox) - 1)), arrCustomMatrix);
+}
+
+void CBacktracking::ApplyData(Record_t record, CBaseEntity* pEntity)
+{
+	m_orgData.flSimtime		= pEntity->GetSimulationTime();
+	m_orgData.vecOrigin		= pEntity->GetOrigin();
+	m_orgData.vecAbsOrigin	= pEntity->GetAbsOrigin();
+	m_orgData.vecMins		= pEntity->GetVecMins();
+	m_orgData.vecMaxs		= pEntity->GetVecMaxs();
+	m_orgData.vecViewOffset = pEntity->GetViewOffset();
+	//m_orgData.angAbsAngles	= pEntity->GetAbsAngles();
+	
+	pEntity->SetAbsOrigin(record.vecAbsOrigin);
+	pEntity->GetSimulationTime() = record.flSimtime;
+	pEntity->GetOrigin()		 = record.vecOrigin;
+	pEntity->GetVecMins()		 = record.vecMins;
+	pEntity->GetVecMaxs()		 = record.vecMaxs;
+	pEntity->GetViewOffset()	 = record.vecViewOffset;
+	//pEntity->GetAbsAngles() = QAngle(record.angAbsAngles);
+}
+
+void CBacktracking::RestoreData(CBaseEntity* pEntity)
+{
+	pEntity->SetAbsOrigin(m_orgData.vecAbsOrigin);
+	pEntity->GetSimulationTime() = m_orgData.flSimtime;
+	pEntity->GetOrigin() = m_orgData.vecOrigin;
+	pEntity->GetVecMins() = m_orgData.vecMins;
+	pEntity->GetVecMaxs() = m_orgData.vecMaxs;
+	pEntity->GetViewOffset() = m_orgData.vecViewOffset;
 }
 
 std::deque<Record_t> CBacktracking::GetPlayerRecord(int iIndex)

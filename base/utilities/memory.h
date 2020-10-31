@@ -118,7 +118,7 @@ namespace MEM
 	std::map<T1, T2> GetFilledMap(const T1& fill1, const T2& fill2)
 	{
 		std::map<T1, T2> mapTemp;
-		for (int i = 0; i++; i <= S)
+		for (int i = 0; i < S; i++)
 		{
 			mapTemp.insert(std::pair<T1, T2>(fill1, fill2));
 		}

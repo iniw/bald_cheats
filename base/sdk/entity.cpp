@@ -95,6 +95,29 @@ Vector CBaseEntity::GetHitboxPosition(int iHitbox)
 	return { };
 }
 
+Vector CBaseEntity::GetHitboxPosition(int iHitbox, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix)
+{
+	assert(iHitbox > HITBOX_INVALID && iHitbox < HITBOX_MAX); // given invalid hitbox index for gethitboxposition
+
+	if (auto pModel = this->GetModel(); pModel != nullptr)
+	{
+		if (auto pStudioModel = I::ModelInfo->GetStudioModel(pModel); pStudioModel != nullptr)
+		{
+			if (auto pHitbox = pStudioModel->GetHitbox(iHitbox, 0); pHitbox != nullptr)
+			{
+				// get mins/maxs by bone
+				Vector vecMin = M::VectorTransform(pHitbox->vecBBMin, arrCustomMatrix.at(pHitbox->iBone));
+				Vector vecMax = M::VectorTransform(pHitbox->vecBBMax, arrCustomMatrix.at(pHitbox->iBone));
+
+				// get center
+				return (vecMin + vecMax) * 0.5f;
+			}
+		}
+	}
+
+	return { };
+}
+
 std::optional<Vector> CBaseEntity::GetHitGroupPosition(int iHitGroup)
 {
 	assert(iHitGroup >= HITGROUP_GENERIC && iHitGroup <= HITGROUP_GEAR); // given invalid hitbox index for gethitgroupposition
@@ -135,6 +158,8 @@ std::optional<Vector> CBaseEntity::GetHitGroupPosition(int iHitGroup)
 
 	return std::nullopt;
 }
+
+
 
 void CBaseEntity::InvalidateBoneCache()
 {

@@ -68,6 +68,7 @@
     <ClInclude Include="sdk\datatypes\vector.h" />
     <ClInclude Include="sdk\definitions.h" />
     <ClInclude Include="sdk\entity.h" />
+    <ClInclude Include="sdk\gamedata.h" />
     <ClInclude Include="sdk\hash\crc32.h" />
     <ClInclude Include="sdk\hash\fnv1a.h" />
     <ClInclude Include="sdk\hash\md5.h" />
@@ -171,9 +172,9 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{F422E214-4936-455B-B8B0-49BC3A106B17}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>qo0_csgo</RootNamespace>
+    <RootNamespace>no_hair</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>cinnamon</ProjectName>
+    <ProjectName>bald_cheats</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -206,14 +207,14 @@
     <LinkIncremental>false</LinkIncremental>
     <IncludePath>$(SolutionDir)dependencies\freetype\include;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)dependencies\freetype\win32;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x86;$(LibraryPath)</LibraryPath>
-    <OutDir>..\..\..\..\Downloads\cs\cheats\qo0</OutDir>
+    <OutDir>..\..\cs\cheats\qo0</OutDir>
     <IntDir>$(SolutionDir)log\$(ProjectName)\$(Configuration)\</IntDir>
     <TargetName>cheat</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>..\..\..\..\Downloads\cs\cheats\qo0</OutDir>
-    <IntDir>..\..\..\..\Downloads\cs\cheats\qo0\intermediate</IntDir>
+    <OutDir>..\..\cs\cheats\qo0</OutDir>
+    <IntDir>..\..\cs\cheats\qo0\intermediate</IntDir>
     <TargetName>zipudhe2</TargetName>
     <IncludePath>$(SolutionDir)dependencies\freetype\include;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(DXSDK_DIR)Include;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)dependencies\freetype\win32;C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x86;$(DXSDK_DIR)Lib\x86;$(LibraryPath)</LibraryPath>

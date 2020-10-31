@@ -13,6 +13,56 @@
 
 // @credits: https://github.com/ValveSoftware/source-sdk-2013/blob/master/mp/src/public/tier0/basetypes.h
 #pragma region valve_basetypes
+
+class CCStrike15ItemSystem;
+class CCStrike15ItemSchema;
+
+template <typename Key, typename Value>
+struct Node_t
+{
+	int previous_id;		//0x0000
+	int next_id;			//0x0004
+	void* _unknown_ptr;		//0x0008
+	int _unknown;			//0x000C
+	Key key;				//0x0010
+	Value value;			//0x0014
+};
+
+template <typename Key, typename Value>
+struct Head_t
+{
+	Node_t<Key, Value>* memory;		//0x0000
+	int allocation_count;			//0x0004
+	int grow_size;					//0x0008
+	int start_element;				//0x000C
+	int next_available;				//0x0010
+	int _unknown;					//0x0014
+	int last_element;				//0x0018
+}; //Size=0x001C
+
+
+// could use CUtlString but this is just easier and CUtlString isn't needed anywhere else
+struct String_t
+{
+	char* buffer;	//0x0000
+	int capacity;	//0x0004
+	int grow_size;	//0x0008
+	int length;		//0x000C
+}; //Size=0x0010
+
+struct CPaintKit
+{
+	int id;						//0x0000
+
+	String_t name;				//0x0004
+	String_t description;		//0x0014
+	String_t item_name;			//0x0024
+	String_t material_name;		//0x0034
+	String_t image_inventory;	//0x0044
+
+	char pad_0x0054[0x8C];		//0x0054
+}; //Size=0x00E0
+
 inline float BitsToFloat(std::uint32_t i)
 {
 	union Convertor_t
@@ -308,6 +358,52 @@ enum EObserverMode : int
 #define CHAR_TEX_GLASS			'Y'
 #define CHAR_TEX_WARPSHIELD		'Z'
 #pragma endregion
+
+
+enum ESequence
+{
+	SEQUENCE_DEFAULT_DRAW = 0,
+	SEQUENCE_DEFAULT_IDLE1 = 1,
+	SEQUENCE_DEFAULT_IDLE2 = 2,
+	SEQUENCE_DEFAULT_LIGHT_MISS1 = 3,
+	SEQUENCE_DEFAULT_LIGHT_MISS2 = 4,
+	SEQUENCE_DEFAULT_HEAVY_MISS1 = 9,
+	SEQUENCE_DEFAULT_HEAVY_HIT1 = 10,
+	SEQUENCE_DEFAULT_HEAVY_BACKSTAB = 11,
+	SEQUENCE_DEFAULT_LOOKAT01 = 12,
+
+	SEQUENCE_BUTTERFLY_DRAW = 0,
+	SEQUENCE_BUTTERFLY_DRAW2 = 1,
+	SEQUENCE_BUTTERFLY_LOOKAT01 = 13,
+	SEQUENCE_BUTTERFLY_LOOKAT03 = 15,
+
+	SEQUENCE_FALCHION_IDLE1 = 1,
+	SEQUENCE_FALCHION_HEAVY_MISS1 = 8,
+	SEQUENCE_FALCHION_HEAVY_MISS1_NOFLIP = 9,
+	SEQUENCE_FALCHION_LOOKAT01 = 12,
+	SEQUENCE_FALCHION_LOOKAT02 = 13,
+
+	SEQUENCE_CSS_LOOKAT01 = 14,
+	SEQUENCE_CSS_LOOKAT02 = 15,
+
+	SEQUENCE_DAGGERS_IDLE1 = 1,
+	SEQUENCE_DAGGERS_LIGHT_MISS1 = 2,
+	SEQUENCE_DAGGERS_LIGHT_MISS5 = 6,
+	SEQUENCE_DAGGERS_HEAVY_MISS2 = 11,
+	SEQUENCE_DAGGERS_HEAVY_MISS1 = 12,
+
+	SEQUENCE_BOWIE_IDLE1 = 1,
+};
+
+enum EInvalidatePhysicsBits : int
+{
+	POSITION_CHANGED = 0x1,
+	ANGLES_CHANGED = 0x2,
+	VELOCITY_CHANGED = 0x4,
+	ANIMATION_CHANGED = 0x8,
+	BOUNDS_CHANGED = 0x10,
+	SEQUENCE_CHANGED = 0x20
+};
 
 // @note: see "sv_dump_class_info" command
 enum class EClassIndex : int

@@ -305,4 +305,13 @@ std::wstring U::AsciiUnicode(const std::string_view szAscii)
 
 	return wszOutput;
 }
+
+int U::UTF8Len(char szFirstByte)
+{
+	return (szFirstByte & 0x80) == 0x00 ? 1 :
+		(szFirstByte & 0xE0) == 0xC0 ? 2 :
+		(szFirstByte & 0xF0) == 0xE0 ? 3 :
+		(szFirstByte & 0xF8) == 0xF0 ? 4 :
+		-1;
+}
 #pragma endregion

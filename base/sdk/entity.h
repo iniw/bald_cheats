@@ -408,7 +408,7 @@ public:
 	N_ADD_PVARIABLE(int, GetObserverMode, "CBasePlayer->m_iObserverMode");
 	N_ADD_VARIABLE(CBaseHandle, GetObserverTargetHandle, "CBasePlayer->m_hObserverTarget");
 	N_ADD_VARIABLE(CBaseHandle, GetViewModelHandle, "CBasePlayer->m_hViewModel[0]");
-	N_ADD_PVARIABLE(const char, GetLastPlace, "CBasePlayer->m_szLastPlaceName");
+	N_ADD_PVARIABLE(const char, GetLastPlace, "CBasePlayer->m_szLastPlaceName");	
 
 	N_ADD_DATAFIELD(int, GetEFlags, this->GetPredictionDescMap(), "m_iEFlags");
 	N_ADD_PDATAFIELD(int, GetButtons, this->GetPredictionDescMap(), "m_nButtons");
@@ -465,18 +465,22 @@ public:
 	N_ADD_VARIABLE_OFFSET(float, GetOldSimulationTime, "CBaseEntity->m_flSimulationTime", 0x4);
 	N_ADD_VARIABLE(Vector, GetOrigin, "CBaseEntity->m_vecOrigin");
 	N_ADD_VARIABLE(QAngle, GetRotation, "CBaseEntity->m_angRotation");
+	N_ADD_VARIABLE(int, GetModelIndex, "CBaseEntity->m_nModelIndex");
 	N_ADD_VARIABLE(int, GetEffects, "CBaseEntity->m_fEffects");
 	N_ADD_VARIABLE(int, GetTeam, "CBaseEntity->m_iTeamNum");
 	N_ADD_VARIABLE(CBaseHandle, GetOwnerEntityHandle, "CBaseEntity->m_hOwnerEntity");
 	N_ADD_PVARIABLE(ICollideable, GetCollision, "CBaseEntity->m_Collision");
 	N_ADD_VARIABLE(int, GetCollisionGroup, "CBaseEntity->m_CollisionGroup");
 	N_ADD_PVARIABLE(bool, IsSpotted, "CBaseEntity->m_bSpotted");
+	N_ADD_VARIABLE(Vector, GetVecMins, "CBaseEntity->m_vecMins")
+	N_ADD_VARIABLE(Vector, GetVecMaxs, "CBaseEntity->m_vecMaxs")
 
 	N_ADD_DATAFIELD(QAngle, GetAbsRotation, this->GetDataDescMap(), "m_angAbsRotation");
 	N_ADD_DATAFIELD(const matrix3x4_t, GetCoordinateFrame, this->GetDataDescMap(), "m_rgflCoordinateFrame");
 	N_ADD_DATAFIELD(int, GetMoveType, this->GetPredictionDescMap(), "m_MoveType");
 
 	N_ADD_OFFSET(float, GetSpawnTime, 0xA370); // @ida: 89 86 ? ? ? ? E8 ? ? ? ? 80 + 0x2
+	N_ADD_VARIABLE_OFFSET(int, GetGloveIndex, "CBaseEntity->m_bIsAutoaimTarget", 0x4);
 	#pragma endregion
 
 	#pragma region DT_BaseCombatCharacter
@@ -628,6 +632,14 @@ public:
 		return oPhysicsRunThink(this, nThinkMethod);
 	}
 
+
+	void InvalidatePhysicsRecursive(EInvalidatePhysicsBits bits)
+	{
+		using InvalidatePhysicsRecursive_t = void(__thiscall*)(decltype(this), EInvalidatePhysicsBits);
+		static InvalidatePhysicsRecursive_t oInvalidatePhysicsRecursive = reinterpret_cast<InvalidatePhysicsRecursive_t>(MEM::FindPattern(CLIENT_DLL, XorStr("55 8B EC 83 E4 F8 83 EC 0C 53 8B 5D 08 8B C3 56")));
+		oInvalidatePhysicsRecursive(this, bits);
+	}
+
 	static CBaseEntity*		GetLocalPlayer();
 	int						GetSequenceActivity(int iSequence);
 	CBaseCombatWeapon*		GetWeapon();
@@ -635,6 +647,7 @@ public:
 	std::optional<Vector>	GetBonePosition(int iBone);
 	int						GetBoneByHash(const FNV1A_t uBoneHash);
 	Vector					GetHitboxPosition(int iHitbox);
+	Vector					GetHitboxPosition(int iHitbox, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix);
 	std::optional<Vector>	GetHitGroupPosition(int iHitGroup);
 	void					ModifyEyePosition(CBasePlayerAnimState* pAnimState, Vector* vecPosition);
 	void					InvalidateBoneCache();
@@ -723,7 +736,7 @@ public:
 	N_ADD_OFFSET(CUtlVector<IRefCounted*>, GetVisualsDataProcessors, 0x230);
 };
 
-class CBaseCombatWeapon : public IClientEntity
+class CBaseCombatWeapon : public CBaseEntity
 {
 public:
 	#pragma region DT_BaseCombatWeapon
@@ -744,7 +757,7 @@ public:
 	N_ADD_VARIABLE(int, GetItemIDLow, "CBaseAttributableItem->m_iItemIDLow");
 	N_ADD_VARIABLE(int, GetAccountID, "CBaseAttributableItem->m_iAccountID");
 	N_ADD_VARIABLE(int, GetEntityQuality, "CBaseAttributableItem->m_iEntityQuality");
-	N_ADD_PVARIABLE(char, GetCustomName, "CBaseAttributableItem->m_szCustomName");
+	N_ADD_VARIABLE(char[32], GetCustomName, "CBaseAttributableItem->m_szCustomName");
 	N_ADD_VARIABLE(int, GetOwnerXuidLow, "CBaseAttributableItem->m_OriginalOwnerXuidLow");
 	N_ADD_VARIABLE(int, GetOwnerXuidHigh, "CBaseAttributableItem->m_OriginalOwnerXuidHigh");
 	N_ADD_VARIABLE(int, GetFallbackPaintKit, "CBaseAttributableItem->m_nFallbackPaintKit");
@@ -762,6 +775,12 @@ public:
 	bool IsWeapon()
 	{
 		return MEM::CallVFunc<bool>(this, 165);
+	}
+
+	bool IsKnife()
+	{
+		short iDefIdx = this->GetItemDefinitionIndex();
+		return (iDefIdx >= WEAPON_KNIFE_BAYONET && iDefIdx <= WEAPON_KNIFE_SKELETON) || iDefIdx == WEAPON_KNIFE_T || iDefIdx == WEAPON_KNIFE;
 	}
 
 	[[nodiscard]] float GetSpread()
@@ -891,11 +910,11 @@ public:
 	#pragma endregion
 };
 
-class CBaseViewModel
+class CBaseViewModel : public IClientEntity
 {
 public:
 	#pragma region DT_BaseViewModel
-	N_ADD_VARIABLE(int, GetModelIndex, "CBaseViewModel->m_nModelIndex");
+	N_ADD_VARIABLE(int, GetSequence, "CBaseViewModel->m_nSequence");
 	N_ADD_VARIABLE(CBaseHandle, GetOwnerHandle, "CBaseViewModel->m_hOwner");
 	N_ADD_VARIABLE(CBaseHandle, GetWeaponHandle, "CBaseViewModel->m_hWeapon");
 	#pragma endregion
@@ -910,6 +929,10 @@ public:
 		// @ida setweaponmodel: 57 8B F9 8B 97 ? ? ? ? 83 FA FF 74 6A
 		MEM::CallVFunc<void>(this, 247, szFileName, pWeapon);
 	}
+};
+
+class CBaseWeaponWorldModel : public CBaseEntity
+{
 };
 
 class CEnvTonemapController

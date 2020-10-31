@@ -23,6 +23,8 @@
 #include "core/config.h"
 // used: hooks setup/destroy
 #include "core/hooks.h"
+// used: Dump()
+#include "features/skinchanger.h"
 
 DWORD WINAPI OnDllAttach(LPVOID lpParameter)
 {
@@ -73,10 +75,12 @@ DWORD WINAPI OnDllAttach(LPVOID lpParameter)
 			throw std::runtime_error(XorStr("failed to set window messages processor"));
 
 		L::Print(XorStr("inputsystem setup complete"));
-
+		
+		#if 0
 		// start tracking entities
 		U::EntityListener.Setup();
 		L::Print(XorStr("entity listener initialized"));
+		#endif
 
 		// start tracking specified events from vector
 		// @note: all events list: https://wiki.alliedmods.net/Counter-Strike:_Global_Offensive_Events
@@ -105,6 +109,9 @@ DWORD WINAPI OnDllAttach(LPVOID lpParameter)
 		}
 		else
 			L::Print(XorStr("default config loaded"));
+
+		CSkinChanger::Get().Dump();
+		L::Print("dumped skins");
 
 		// show message about successful load in logs and in game console
 		L::PushConsoleColor(FOREGROUND_MAGENTA);
@@ -138,8 +145,9 @@ DWORD WINAPI OnDllDetach(LPVOID lpParameter)
 		L::ofsFile.close();
 	#endif
 
+	#if 0
 	U::EntityListener.Destroy();
-
+	#endif
 	// destroy events listener
 	U::EventListener.Destroy();
 

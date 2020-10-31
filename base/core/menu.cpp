@@ -18,16 +18,20 @@
 #include "../features/skinchanger.h"
 // used: inputtext() wrappers for c++ standard library (stl) type: std::string
 #include "../../dependencies/imgui/cpp/imgui_stdlib.h"
+// used: ForceFullUpdate()
+#include "../utilities.h"
+// used: vecSkinKits and vecGloveKits
+#include "../sdk/gamedata.h"
 
 #pragma region menu_arrays
-const char* arrVisualsFlags[] =
+static const char* arrVisualsFlags[] =
 {
 	"armor",
 	"kit",
 	"scoped"
 };
 
-const char* arrVisualsRemovals[] =
+static const char* arrVisualsRemovals[] =
 {
 	"post-processing",
 	"flashbang",
@@ -81,13 +85,13 @@ void W::MainWindow(IDirect3DDevice9* pDevice)
 			pForegroundDrawList->AddRectFilled(ImVec2(vecPos.x - 8.f, vecPos.y - 6.f), ImVec2(vecPos.x + flWindowWidth - 8.f, vecPos.y - 8.f), IM_COL32(232, 80, 90, 255));
 
 			// add tabs
-			static std::array<CTab, 3U> const arrTabs =
+			static std::array<CTab, 4U> const arrTabs =
 			{
 				//CTab{ "rage", &T::RageBot },
 				CTab{ "legit", &T::LegitBot },
 				CTab{ "visuals", &T::Visuals },
-				CTab{ "miscellaneous", &T::Miscellaneous }
-				//CTab{ "skinchanger", &T::SkinChanger }
+				CTab{ "miscellaneous", &T::Miscellaneous },
+				CTab{ "skinchanger", &T::SkinChanger }
 			};
 
 			T::Render<arrTabs.size()>(XorStr("main_tabs"), arrTabs, &iMainTab, style.Colors[ImGuiCol_TabActive]);
@@ -141,8 +145,10 @@ void T::LegitBot()
 
 	ImGui::Columns(2, nullptr, false);
 	{
-		ImGui::BeginChild(XorStr("legitbot.aimbot"), ImVec2(0, 215), true, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar);
-		{if (ImGui::BeginMenuBar())
+		ImGui::BeginChild(XorStr("legitbot.aimbot"), ImVec2(0, 215), true, ImGuiWindowFlags_MenuBar);
+		{
+		
+		if (ImGui::BeginMenuBar())
 		{
 			ImGui::TextUnformatted(XorStr("aim  assistance"));
 			ImGui::EndMenuBar();
@@ -153,11 +159,12 @@ void T::LegitBot()
 		int iWeaponType = C::Get<int>(Vars.iLegitWeapon);
 		ImGui::Checkbox(XorStr("master switch"), &C::Get<bool>(Vars.bLegit));
 		ImGui::Combo(XorStr("weapon config"), &C::Get<int>(Vars.iLegitWeapon), XorStr("rifles\0snipers\0pistols\0heavy pistols\0smgs\0other\0\0"));
-		ImGui::HotKey(XorStr("aim key##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, iAimKey));
 		ImGui::Combo(XorStr("hitbox selection"), &C_GET_LEGITVAR_TYPE(iWeaponType, iAimHitbox), XorStr("closest\0head\0chest\0stomach\0\0"));
 		ImGui::SliderFloat(XorStr("maximum fov##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, flAimFov), 0, 20, u8"%.1f\u00B0");
 		if (!C_GET_LEGITVAR_TYPE(iWeaponType, bAimSilent))
 			ImGui::SliderFloat(XorStr("smoothing amount##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, flAimSmooth), 1, 10, "%.1f");
+		ImGui::HotKey(XorStr("aim key##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, iAimKey));
+		ImGui::Checkbox(XorStr("aim at backtrack"), &C_GET_LEGITVAR_TYPE(iWeaponType, bAimAtBacktrack));
 		ImGui::Checkbox(XorStr("silent aim##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, bAimSilent));
 		if (iWeaponType != (int)ELegitWeaponTypes::SNIPERS) // no rcs for snipers
 			ImGui::Checkbox(XorStr("recoil control##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, bAimRCS));
@@ -467,7 +474,7 @@ void T::Visuals()
 			ImGui::EndChild();
 		}
 
-		ImGui::BeginChild(XorStr("visuals.screen"), ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar);
+		ImGui::BeginChild(XorStr("visuals.screen"), ImVec2(0, 0), true, ImGuiWindowFlags_MenuBar);
 		{
 			if (ImGui::BeginMenuBar())
 			{
@@ -650,12 +657,98 @@ void T::Miscellaneous()
 
 void T::SkinChanger()
 {
-	ImGui::BeginChild(XorStr("skins"), ImVec2(), true);
-	{
-		for (const auto& item : mapItemList) //first - itemdefindex, second - skin item struct
-		{
+	ImGuiStyle& style = ImGui::GetStyle();
 
+	ImGui::BeginChild(XorStr("skinchanger"), ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar);
+	{
+		if (ImGui::BeginMenuBar())
+		{
+			ImGui::TextUnformatted(XorStr("skinchanger"));
+			ImGui::EndMenuBar();
 		}
+
+		ImGui::Columns(2, nullptr, false);
+		{
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1.f));
+
+			ImGui::PushItemWidth(106.f);
+			ImGui::Combo("##1", &C::Get<int>(Vars.iSkinchangerWeapon),
+				[](void* data, int idx, const char** out_text)
+				{
+					*out_text = arrWeaponNames[idx].second;
+					return true;
+				}, nullptr, 35, 8); int iIndex = arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first;
+
+			SkinchangerVariables_t& WeaponVars = CSkinChanger::Get().mapSkinchangerVars[iIndex];
+			WeaponVars.iDefinitionIndex = iIndex;
+
+			if (iIndex == WEAPON_KNIFE) // if knife is selected
+			{
+				ImGui::SameLine(125.f);
+				ImGui::Combo("##2", &C::Get<int>(Vars.iSkinchangerKnife),
+					[](void* data, int idx, const char** out_text)
+					{
+						*out_text = arrKnifeNames[idx].second;
+						return true;
+					}, nullptr, 19, 8); WeaponVars.iDefinitionIndexOverride = arrKnifeNames[C::Get<int>(Vars.iSkinchangerKnife)].first;
+			}
+			else if (iIndex == GLOVE_T)
+			{
+				ImGui::SameLine(125.f);
+				ImGui::Combo("##2", &C::Get<int>(Vars.iSkinchangerGlove),
+					[](void* data, int idx, const char** out_text)
+					{
+						*out_text = arrGlovesNames[idx].second;
+						return true;
+					}, nullptr, 8, 8); WeaponVars.iDefinitionIndexOverride = arrGlovesNames[C::Get<int>(Vars.iSkinchangerGlove)].first;
+			}
+
+			ImGui::PopItemWidth();
+
+			ImGui::PushItemWidth(-1.f);
+
+			ImGui::ListBox("##3", &WeaponVars.iPaintKitIndex,
+				[](void* data, int idx, const char** out_text)
+				{
+					*out_text = arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first == GLOVE_T ? CSkinChanger::Get().vecGloveKits[idx].szName.data() : CSkinChanger::Get().vecSkinKits[idx].szName.data();
+					return true;
+				}, nullptr, iIndex == GLOVE_T ? CSkinChanger::Get().vecGloveKits.size() : CSkinChanger::Get().vecSkinKits.size(), 13); 
+			WeaponVars.iPaintKit = iIndex == GLOVE_T ? CSkinChanger::Get().vecGloveKits[WeaponVars.iPaintKitIndex].iId : CSkinChanger::Get().vecSkinKits[WeaponVars.iPaintKitIndex].iId;
+
+			ImGui::PopStyleVar();
+		}
+		ImGui::NextColumn();
+		{
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1.f));
+
+			SkinchangerVariables_t& WeaponVars = CSkinChanger::Get().mapSkinchangerVars[arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first];
+
+			ImGui::Checkbox(XorStr("enable"), &WeaponVars.bEnabled);
+			ImGui::SliderInt(XorStr("seed"), &WeaponVars.iSeed, 0, 1000);
+			ImGui::SliderFloat(XorStr("wear"), &WeaponVars.flWear, 0.f, 1.f, "%.5f");
+
+			if (arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first != GLOVE_T)
+			{
+				ImGui::Checkbox(XorStr("stattrak"), &WeaponVars.bStatTrak);
+				if (WeaponVars.bStatTrak)
+					ImGui::InputInt("", &WeaponVars.iStatTrak);
+
+				ImGui::Checkbox(XorStr("nametag"), &WeaponVars.bNameTag);
+				if (WeaponVars.bNameTag)
+					ImGui::InputText(XorStr("text"), &WeaponVars.szNameTag);
+			}
+
+			ImGui::PopStyleVar();
+		}
+		ImGui::Columns(1);
+
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 0.5f));
+
+		ImGui::Separator();
+		if (ImGui::Button(XorStr("update"), ImVec2(-1, 0)))
+			U::ForceFullUpdate();
+
+		ImGui::PopStyleVar();
 
 		ImGui::EndChild();
 	}

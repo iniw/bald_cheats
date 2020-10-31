@@ -16,12 +16,14 @@
 #include "../utilities.h"
 // used: render windows
 #include "menu.h"
+// used: randomint
+#include "../utilities/math.h"
 
 /* features */
-#include "../features/lagcompensation.h"
 #include "../features/prediction.h"
 #include "../features/ragebot.h"
 #include "../features/legitbot.h"
+#include "../features/lagcompensation.h"
 #include "../features/triggerbot.h"
 #include "../features/visuals.h"
 #include "../features/misc.h"
@@ -286,9 +288,11 @@ bool FASTCALL H::hkCreateMove(IClientModeShared* thisptr, int edx, float flInput
 
 		if (C::Get<bool>(Vars.bTrigger))
 			CTriggerBot::Get().Run(pCmd, pLocal);
-		
+
+		#if 0
 		if (C::Get<bool>(Vars.bBacktracking))
 			CBacktracking::Get().Run(pCmd, pLocal);
+		#endif
 	}
 	CPrediction::Get().End(pCmd, pLocal);
 
@@ -385,10 +389,8 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 
 	if (!I::Engine->IsInGame())
 	{
-		// clear sequences or we get commands overflow on new map connection
-		CLagCompensation::Get().ClearIncomingSequences();
-		// clear hitmarker info
-		CVisuals::Get().vecHitMarks.clear();
+		CLagCompensation::Get().ClearIncomingSequences(); // clear sequences or we get commands overflow on new map connection
+		CVisuals::Get().vecHitMarks.clear(); // clear hitmarker info
 		return oFrameStageNotify(thisptr, edx, stage);
 	}
 
@@ -402,8 +404,6 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 
 	static QAngle angAimPunchOld = { }, angViewPunchOld = { };
 
-	CBacktracking::Get().Init();
-
 	switch (stage)
 	{
 	case FRAME_NET_UPDATE_POSTDATAUPDATE_START:
@@ -412,6 +412,9 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 		 * data has been received and we are going to start calling postdataupdate
 		 * e.g. resolver or skinchanger and other visuals
 		 */
+
+		if(pLocal != nullptr)
+			CSkinChanger::Get().Run(pLocal);
 
 		break;
 	}
@@ -467,11 +470,10 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 		 */
 
 		 // set max flash alpha
+		*pLocal->GetFlashMaxAlpha() = C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_FLASHBANG) ? 0.f : 255.f;
 
 		//CVisuals::Get().NightMode();
 		CVisuals::Get().Removals();
-
-		*pLocal->GetFlashMaxAlpha() = C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_FLASHBANG) ? 0.f : 255.f;
 
 		for (int i = 1; i <= I::Globals->nMaxClients; i++)
 		{
@@ -759,7 +761,7 @@ void FASTCALL H::hkGetLocalViewAngles(void* ecx, void* edx, QAngle& ang)
 		ang.Init();
 
 	if (I::Engine->IsRecordingDemo())
-		I::Engine->GetViewAngles(ang);
+		I::Engine->GetViewAngles(ang); // pov demo psilent
 	else
 		oGetLocalViewAngles(ecx, edx, ang);
 }
@@ -872,6 +874,12 @@ bool P::Setup()
 	RVP::SmokeEffectTickBegin = std::make_shared<CRecvPropHook>(pSmokeEffectTickBegin, P::SmokeEffectTickBegin);
 	#endif
 
+	RecvProp_t* pSequence = CNetvarManager::Get().mapProps[FNV1A::HashConst("CBaseViewModel->m_nSequence")].pRecvProp;
+	if (pSequence == nullptr)
+		return false;
+
+	RVP::Sequence = std::make_shared<CRecvPropHook>(pSequence, P::Sequence);
+
 	return true;
 }
 
@@ -882,6 +890,8 @@ void P::Restore()
 	// restore smoke effect
 	RVP::SmokeEffectTickBegin->Restore();
 	#endif
+
+	RVP::Sequence->Restore();
 }
 #pragma endregion
 
@@ -897,5 +907,19 @@ void P::SmokeEffectTickBegin(const CRecvProxyData* pData, void* pStruct, void* p
 	}
 
 	oSmokeEffectTickBegin(pData, pStruct, pOut);
+}
+
+void P::Sequence(const CRecvProxyData* pData, void* pStruct, void* pOut)
+{
+	static auto oSequence = RVP::Sequence->GetOriginal();
+
+	CBaseViewModel* pViewmodel = static_cast<CBaseViewModel*>(pStruct);
+
+	CRecvProxyData* pModifiableData = const_cast<CRecvProxyData*>(pData);
+
+	if (!CSkinChanger::Get().FixSequences(pModifiableData, pViewmodel))
+		return oSequence(pData, pStruct, pOut);
+
+	oSequence(pData, pStruct, pOut);
 }
 #pragma endregion
