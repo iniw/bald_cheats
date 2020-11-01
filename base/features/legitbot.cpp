@@ -47,30 +47,17 @@ bool CLegitBot::GetTargetData(CBaseEntity* pLocal, Target_t& Target)
 
 	Target.vecHitboxPos = GetBestHitbox(pLocal, Target.pEntity);
 	Target.angAngle = M::CalcAngle(m_vecLocalEyePos, Target.vecHitboxPos).Clamped();
-	Target.flAngleDelta = (Target.angAngle - m_angLocalViewAngles).Length();
+	Target.flAngleDelta = (Target.angAngle - m_angLocalViewAngles).Clamped().Length();
 	Target.iIndex = Target.pEntity->GetIndex();
 
-	std::deque<Record_t> deqRecords = CBacktracking::Get().GetPlayerRecord(Target.iIndex);
-
-	if (!deqRecords.empty() && C_GET_LEGITVAR(bAimAtBacktrack))
+	if (C_GET_LEGITVAR(bAimAtBacktrack) && CBacktracking::Get().m_flBestRecordDelta && CBacktracking::Get().m_flBestRecordDelta < Target.flAngleDelta) // we have a record and that record is better than current delta
 	{
-		for (auto record : deqRecords)
-		{
-			QAngle angRecordAngle = M::CalcAngle(m_vecLocalEyePos, record.vecHitboxPos).Clamped();
-			float flRecordAngleDelta = (angRecordAngle - m_angLocalViewAngles).Length();
-
-			if (flRecordAngleDelta < Target.flAngleDelta)
-			{
-				Target.bShouldBacktrack = true;
-				Target.Record = record;
-				Target.vecHitboxPos = record.vecHitboxPos;
-				Target.angAngle = angRecordAngle;
-				Target.flAngleDelta = flRecordAngleDelta;
-			}
-
-		}
+		Target.bShouldBacktrack = true;
+		Target.Record = CBacktracking::Get().m_BestRecord;
+		Target.vecHitboxPos = Target.Record.vecHitboxPos;
+		Target.angAngle = M::CalcAngle(m_vecLocalEyePos, Target.Record.vecHitboxPos).Clamped();
+		Target.flAngleDelta = (Target.angAngle - m_angLocalViewAngles).Clamped().Length();
 	}
-
 	return true;
 }
 
@@ -90,7 +77,7 @@ CBaseEntity* CLegitBot::GetBestEntity(CBaseEntity* pLocal)
 			continue;
 
 		QAngle angAngle = (M::CalcAngle(m_vecLocalEyePos, pEntity->GetEyePosition(false)) - pLocal->GetPunch() * m_weapon_recoil_scale->GetFloat()).Clamped();
-		float flDelta = (angAngle - m_angLocalViewAngles).Length();
+		float flDelta = (angAngle - m_angLocalViewAngles).Clamped().Length();
 
 		if (flDelta < flBestDelta)
 		{
@@ -114,7 +101,7 @@ Vector CLegitBot::GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity)
 		{
 				Vector vecHitboxPos = pEntity->GetHitboxPosition(m_arrClosestHitboxes.at(i));
 				QAngle angAngle = M::CalcAngle(m_vecLocalEyePos, vecHitboxPos).Clamped();
-				float flDelta = (angAngle - m_angLocalViewAngles).Length();
+				float flDelta = (angAngle - m_angLocalViewAngles).Clamped().Length();
 
 				if (flDelta < iBestDelta)
 				{
@@ -131,17 +118,20 @@ Vector CLegitBot::GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity)
 
 void CLegitBot::FinalizeAngle(CBaseEntity* pLocal, QAngle& angAngle)
 {
-	angAngle.Normalize();
+	angAngle.Normalize(); 
+	angAngle.Clamp();
 
 	if (C_GET_LEGITVAR(bAimRCS))
+	{
 		angAngle -= pLocal->GetPunch() * m_weapon_recoil_scale->GetFloat();
-
-	angAngle.Clamp();
+		angAngle.Clamp();
+	}
 
 	if (!C_GET_LEGITVAR(bAimSilent) && C_GET_LEGITVAR(flAimSmooth) > 1.f)
+	{
 		angAngle = m_angLocalViewAngles + (angAngle - m_angLocalViewAngles) / C_GET_LEGITVAR(flAimSmooth);
-
-	angAngle.Clamp();
+		angAngle.Clamp();
+	}
 }
 
 void CLegitBot::ApplyAngle(CUserCmd* pCmd, QAngle angAngle)

@@ -47,6 +47,7 @@ namespace VTABLE
 
 		/* engine table */
 		ISCONNECTED = 27,
+		ISHLTV = 93,
 
 		/* bsp query table */
 		LISTLEAVESINBOX = 6,

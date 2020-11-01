@@ -783,6 +783,12 @@ public:
 		return (iDefIdx >= WEAPON_KNIFE_BAYONET && iDefIdx <= WEAPON_KNIFE_SKELETON) || iDefIdx == WEAPON_KNIFE_T || iDefIdx == WEAPON_KNIFE;
 	}
 
+	bool IsGlove()
+	{
+		short iDefIdx = this->GetItemDefinitionIndex();
+		return (iDefIdx >= GLOVE_T && iDefIdx <= GLOVE_HYDRA);
+	}
+
 	[[nodiscard]] float GetSpread()
 	{
 		return MEM::CallVFunc<float>(this, 452);

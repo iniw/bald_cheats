@@ -36,7 +36,7 @@ private:
 		return rand() % (iMax - iMin + 1) + iMin;
 	}
 	/* fixes knife sequences */
-	int GetFixedAnimation(const short nDefinitionIndex, const int iSequence, CBaseEntity* pOwner);
+	int GetCorrectSequence(const short nDefinitionIndex, const int iSequence, CBaseEntity* pOwner);
 	/* creates glove entity */
 	CBaseCombatWeapon* MakeGlove(int iEntry, int iSerial);
 	/* apply skins and models to weapons */

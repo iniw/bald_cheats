@@ -159,6 +159,33 @@ bool C::Save(std::string_view szFileName)
 				entry[XorStr("value")] = sub.dump();
 				break;
 			}
+			case FNV1A::HashConst("std::map<int, SkinchangerVariables_t>"):
+			{
+				auto mapVariables = variable.Get<std::map<int, SkinchangerVariables_t>>();
+
+				// store vector values as sub-node
+				nlohmann::json sub;
+
+				for (auto& weapon : mapVariables)
+				{
+					sub.push_back(weapon.first);
+					sub.push_back(weapon.second.bEnabled);
+					sub.push_back(weapon.second.iPaintKit);
+					sub.push_back(weapon.second.iPaintKitIndex);
+					sub.push_back(weapon.second.iSeed);
+					sub.push_back(weapon.second.bStatTrak);
+					sub.push_back(weapon.second.iStatTrak);
+					sub.push_back(weapon.second.iQuality);
+					sub.push_back(weapon.second.bNameTag);
+					sub.push_back(weapon.second.szNameTag);
+					sub.push_back(weapon.second.flWear);
+					sub.push_back(weapon.second.iDefinitionIndex);
+					sub.push_back(weapon.second.iDefinitionIndexOverride);
+				}
+
+				entry[XorStr("value")] = sub.dump();
+				break;
+			}
 			default:
 				break;
 			}

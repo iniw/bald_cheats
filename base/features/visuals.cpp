@@ -20,7 +20,7 @@
 #include "../utilities.h"
 // used: _bstr_t
 #include <comdef.h>
-#include "../utilities/logging.h"
+#include "../features/lagcompensation.h"
 
 // @note: avoid store imcolor, store either u32 of imvec4
 void CVisuals::Store()
@@ -188,6 +188,20 @@ void CVisuals::Store()
 				// get player bounding box
 				if (!GetBoundingBox(pEntity, &ctx.box))
 					break;
+
+				std::deque deqPlayerRecords = CBacktracking::Get().GetPlayerRecord(pEntity->GetIndex());
+
+				if (!deqPlayerRecords.empty())
+				{
+					for (auto& record : deqPlayerRecords)
+					{
+						Vector2D vecScreen = { };
+						if (!D::WorldToScreen(record.vecHeadPos, vecScreen))
+							continue;
+
+						D::AddCircle(ImVec2(vecScreen.x, vecScreen.y), 1.f, Color(255, 255, 255, 255), 12, IMGUI_CIRCLE_FILLED);
+					}
+				}
 
 				Player(pLocal, pEntity, ctx, flDistance, Color(255, 255, 255, 255), Color(20, 20, 20, 150), Color(0, 0, 0, 220));			
 			}

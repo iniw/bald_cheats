@@ -40,6 +40,9 @@ public:
 	const std::array<int, 3U> m_arrHitboxes = { HITBOX_HEAD, HITBOX_CHEST, HITBOX_STOMACH }; // @note these should always match the ones in the menu
 	const std::array<int, 5U> m_arrClosestHitboxes = { HITBOX_HEAD, HITBOX_NECK, HITBOX_THORAX, HITBOX_UPPER_CHEST, HITBOX_STOMACH };
 
+	/* member variables */
+	Target_t m_Target;
+
 private:
 	/* determines if the aimbot should run */
 	bool		 ShouldRun(CBaseEntity* pLocal);
@@ -68,8 +71,6 @@ private:
 	/* applies the angle */
 	void		 ApplyAngle(CUserCmd* pCmd, QAngle angAngle);
 
-	/* member variables */
-	Target_t m_Target;
 	QAngle m_angLocalViewAngles;
 	Vector m_vecLocalEyePos;
 	CConVar* m_weapon_recoil_scale = I::ConVar->FindVar(XorStr("weapon_recoil_scale"));

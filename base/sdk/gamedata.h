@@ -1,10 +1,7 @@
 #pragma once
 #include <map>
-#include <vector>
 #include <string>
 
-// used: winapi includes, singleton
-#include "../common.h"
 // used: itemdefinitionindex; baseentity, baseweapon classes
 #include "../sdk/entity.h"
 
@@ -192,6 +189,7 @@ static std::unordered_map<int, SkinObject_t> mapItemList =
 	{ WEAPON_CZ75A, { "CZ75 Auto", "models/weapons/v_pist_cz_75.mdl", "cz75a" } },
 	{ WEAPON_REVOLVER, { "R8 Revolver", "models/weapons/v_pist_revolver.mdl", "revolver" } },
 	{ WEAPON_KNIFE_BAYONET, { "Bayonet", "models/weapons/v_knife_bayonet.mdl", "bayonet" } },
+	{ WEAPON_KNIFE_CSS, { "Classic Knife",  "models/weapons/v_knife_css.mdl", "knife_css"} },
 	{ WEAPON_KNIFE_FLIP, { "Flip Knife", "models/weapons/v_knife_flip.mdl", "knife_flip" } },
 	{ WEAPON_KNIFE_GUT, { "Gut Knife", "models/weapons/v_knife_gut.mdl", "knife_gut" } },
 	{ WEAPON_KNIFE_KARAMBIT, { "Karambit", "models/weapons/v_knife_karam.mdl", "knife_karambit" } },

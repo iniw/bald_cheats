@@ -43,6 +43,11 @@ public:
 	{
 		return static_cast<T*>(GetClientEntityFromHandle(hEntity));
 	}
+	template <class T = IClientEntity>
+	inline T* GetFromHandle(const CBaseHandle hEntity)
+	{
+		return hEntity == 0xFFFFFFFF ? nullptr : static_cast<T*>(GetClientEntityFromHandle(hEntity));
+	}
 
 	void AddListenerEntity(IClientEntityListener* pListener)
 	{

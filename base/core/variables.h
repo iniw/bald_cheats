@@ -338,7 +338,7 @@ struct Variables_t
 	C_ADD_VARIABLE(int, iSkinchangerKnife, 0);
 	C_ADD_VARIABLE(int, iSkinchangerGlove, 0);
 	C_ADD_VARIABLE(int, iSkinchangerPaintKit, 0);
-	//C_ADD_VARIABLE_MAP(int, SkinchangerVariables_t, MAX_WEAPONS, mapSkinchangerVars, 0, SkinchangerVariables_t());
+	C_ADD_VARIABLE_MAP(int, SkinchangerVariables_t, MAX_WEAPONS, mapSkinchangerVars, 0, SkinchangerVariables_t());
 #pragma endregion
 
 	#pragma region variables_menu

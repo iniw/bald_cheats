@@ -13,28 +13,12 @@
 
 void CSkinChanger::Run(CBaseEntity* pLocal)
 {
-	const CBaseHandle hViewmodel = pLocal->GetViewModelHandle();
-	if (hViewmodel == INVALID_EHANDLE_INDEX)
-		return;
-
-	CBaseViewModel* pViewmodel = I::ClientEntityList->Get<CBaseViewModel>(hViewmodel);
+	CBaseViewModel* pViewmodel = I::ClientEntityList->GetFromHandle<CBaseViewModel>(pLocal->GetViewModelHandle());
 	if (pViewmodel == nullptr)
 		return;
-	
-	const CBaseHandle hViewmodelWeapon = pViewmodel->GetWeaponHandle();
-	if (hViewmodelWeapon == INVALID_EHANDLE_INDEX)
-		return;
 
-	CBaseCombatWeapon* pViewmodelWeapon = I::ClientEntityList->Get<CBaseCombatWeapon>(hViewmodelWeapon);
+	CBaseCombatWeapon* pViewmodelWeapon = I::ClientEntityList->GetFromHandle<CBaseCombatWeapon>(pViewmodel->GetWeaponHandle());
 	if (pViewmodelWeapon == nullptr)
-		return;
-
-	const CBaseHandle hWorldModel = pViewmodelWeapon->GetWorldModelHandle();
-	if (hWorldModel == INVALID_EHANDLE_INDEX)
-		return;
-
-	CBaseWeaponWorldModel* pWorldModel = I::ClientEntityList->Get<CBaseWeaponWorldModel>(hWorldModel);
-	if (pWorldModel == nullptr)
 		return;
 
 	Weapons(pLocal);
@@ -69,10 +53,10 @@ void CSkinChanger::Weapons(CBaseEntity* pLocal)
 
 			short nDefinitionIndex = pWeapon->IsKnife() ? WEAPON_KNIFE : pWeapon->GetItemDefinitionIndex();
 
-			if (mapSkinchangerVars.find(nDefinitionIndex) == mapSkinchangerVars.end() || mapItemList.find(nDefinitionIndex) == mapItemList.end())
+			if (mapItemList.find(nDefinitionIndex) == mapItemList.end())
 				continue;
 
-			SkinchangerVariables_t WeaponVars = mapSkinchangerVars[nDefinitionIndex];
+			SkinchangerVariables_t WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[nDefinitionIndex];
 
 			Apply(pWeapon, WeaponVars, pInfo.nXuidLow);
 		}
@@ -87,11 +71,11 @@ void CSkinChanger::Gloves(CBaseEntity* pLocal)
 
 	CBaseHandle hGlove = hWereables[0];
 
-	CBaseCombatWeapon* pGlove = hGlove == INVALID_EHANDLE_INDEX ? nullptr :I::ClientEntityList->Get<CBaseCombatWeapon>(hGlove);
+	CBaseCombatWeapon* pGlove = I::ClientEntityList->GetFromHandle<CBaseCombatWeapon>(hGlove);
+
 	if (pGlove == nullptr)
 	{
-
-		CBaseCombatWeapon* pOurGlove = hDefaultGlove == INVALID_EHANDLE_INDEX ? nullptr :I::ClientEntityList->Get<CBaseCombatWeapon>(hDefaultGlove);
+		CBaseCombatWeapon* pOurGlove = I::ClientEntityList->GetFromHandle<CBaseCombatWeapon>(hDefaultGlove);
 		if (pOurGlove)
 		{
 			hWereables[0] = hDefaultGlove;
@@ -116,6 +100,9 @@ void CSkinChanger::Gloves(CBaseEntity* pLocal)
 
 		pGlove = MakeGlove(iEntry, iSerial);
 
+		if (pGlove == nullptr)		
+			return;
+
 		hWereables[0] = iEntry | iSerial << 16;
 
 		// let's store it in case we somehow lose it.
@@ -129,7 +116,7 @@ void CSkinChanger::Gloves(CBaseEntity* pLocal)
 	pGlove->GetGloveIndex() = -1;
 	pGlove->GetItemIDHigh() = -1;
 
-	SkinchangerVariables_t WeaponVars = mapSkinchangerVars[GLOVE_T];
+	SkinchangerVariables_t WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[GLOVE_T];
 
 	Apply(pGlove, WeaponVars, pInfo.nXuidLow);
 
@@ -180,8 +167,12 @@ CBaseCombatWeapon* CSkinChanger::MakeGlove(int iEntry, int iSerial)
 
 	CBaseCombatWeapon* pGlove = static_cast<CBaseCombatWeapon*>(I::ClientEntityList->GetClientEntity(iEntry));
 
-	assert(pGlove);
-	
+	if (pGlove == nullptr)
+	{
+		L::Print("couldn't create glove entity, returning");
+		return nullptr;
+	}
+
 	pGlove->SetAbsOrigin({ MAX_COORD_FLOAT, MAX_COORD_FLOAT, MAX_COORD_FLOAT });
 
 	return pGlove;
@@ -243,7 +234,7 @@ void CSkinChanger::Dump()
 		std::transform(vecGloveKits[i].szName.begin(), vecGloveKits[i].szName.end(), vecGloveKits[i].szName.begin(), ::tolower);
 }
 
-int CSkinChanger::GetFixedAnimation(const short nDefinitionIndex, const int iSequence, CBaseEntity* pOwner)
+int CSkinChanger::GetCorrectSequence(const short nDefinitionIndex, const int iSequence, CBaseEntity* pViewmodelOwner)
 {
 	if (nDefinitionIndex == WEAPON_KNIFE_BUTTERFLY
 		|| nDefinitionIndex == WEAPON_KNIFE_FALCHION
@@ -253,8 +244,8 @@ int CSkinChanger::GetFixedAnimation(const short nDefinitionIndex, const int iSeq
 	{
 		if (iSequence == SEQUENCE_DEFAULT_IDLE1 || iSequence == SEQUENCE_DEFAULT_IDLE2)
 		{
-			pOwner->GetCycle() = 0.999f;
-			pOwner->InvalidatePhysicsRecursive(ANIMATION_CHANGED);
+			pViewmodelOwner->GetCycle() = 0.999f;
+			pViewmodelOwner->InvalidatePhysicsRecursive(ANIMATION_CHANGED);
 		}
 	}
 
@@ -388,31 +379,19 @@ int CSkinChanger::GetFixedAnimation(const short nDefinitionIndex, const int iSeq
 
 bool CSkinChanger::FixSequences(CRecvProxyData* pData, CBaseViewModel* pViewmodel)
 {
-	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
-	if (pLocal == nullptr || !pLocal->IsAlive())
+	CBaseEntity* pViewmodelOwner = I::ClientEntityList->GetFromHandle<CBaseEntity>(pViewmodel->GetOwnerHandle());
+	if (pViewmodelOwner == nullptr || pViewmodelOwner->GetIndex() != I::Engine->GetLocalPlayer())
 		return false;
 
-	const CBaseHandle hViewmodelOwner = pViewmodel->GetOwnerHandle();
-	if (hViewmodelOwner == INVALID_EHANDLE_INDEX)
-		return false;
-
-	CBaseEntity* pViewmodelOwner = I::ClientEntityList->Get<CBaseEntity>(hViewmodelOwner);
-	if (pViewmodelOwner != pLocal)
-		return false;
-
-	const CBaseHandle hViewmodelWeapon = pViewmodel->GetWeaponHandle();
-	if (hViewmodelWeapon == INVALID_EHANDLE_INDEX)
-		return false;
-
-	CBaseCombatWeapon* pViewmodelWeapon = I::ClientEntityList->Get<CBaseCombatWeapon>(hViewmodelWeapon);
+	CBaseCombatWeapon* pViewmodelWeapon = I::ClientEntityList->GetFromHandle<CBaseCombatWeapon>(pViewmodel->GetWeaponHandle());
 	if (pViewmodelWeapon == nullptr)
 		return false;
 
 	short nDefinitionIndex = pViewmodelWeapon->GetItemDefinitionIndex();
 
-	if (mapItemList.find(nDefinitionIndex) == mapItemList.end())
+	if (mapItemList.find(nDefinitionIndex) == mapItemList.end() || !pViewmodelWeapon->IsKnife())
 		return false;
 
 	long& iSequence = pData->Value.Int;
-	iSequence = GetFixedAnimation(nDefinitionIndex, iSequence, pViewmodelOwner);
+	iSequence = GetCorrectSequence(nDefinitionIndex, iSequence, pViewmodelOwner);
 }

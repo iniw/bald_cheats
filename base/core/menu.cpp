@@ -679,7 +679,7 @@ void T::SkinChanger()
 					return true;
 				}, nullptr, 35, 8); int iIndex = arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first;
 
-			SkinchangerVariables_t& WeaponVars = CSkinChanger::Get().mapSkinchangerVars[iIndex];
+			SkinchangerVariables_t& WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[iIndex];
 			WeaponVars.iDefinitionIndex = iIndex;
 
 			if (iIndex == WEAPON_KNIFE) // if knife is selected
@@ -721,7 +721,7 @@ void T::SkinChanger()
 		{
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1.f));
 
-			SkinchangerVariables_t& WeaponVars = CSkinChanger::Get().mapSkinchangerVars[arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first];
+			SkinchangerVariables_t& WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first];
 
 			ImGui::Checkbox(XorStr("enable"), &WeaponVars.bEnabled);
 			ImGui::SliderInt(XorStr("seed"), &WeaponVars.iSeed, 0, 1000);

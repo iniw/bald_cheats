@@ -73,7 +73,8 @@ struct Record_t
 	Vector vecMins;
 	Vector vecMaxs;
 	Vector vecViewOffset;
-	//QAngle angAbsAngles;
+	QAngle angAbsAngles;
+	studiohdr_t* pModel;
 	std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix;
 };
 
@@ -85,27 +86,40 @@ struct OriginalData_t
 	Vector vecMins;
 	Vector vecMaxs;
 	Vector vecViewOffset;
-	//QAngle angAbsAngles;
+	QAngle angAbsAngles;
 };
 
 class CBacktracking : public CSingleton<CBacktracking>
 {
 public:
+	//Get
 	void Run(CUserCmd* pCmd, CBaseEntity* pLocal);
+	/* fills the records array and deque */
 	void Update(CBaseEntity* pLocal);
+	/* returns the deque that belongs to the index */
 	std::deque<Record_t> GetPlayerRecord(int iIndex);
+	/* applies the stored data */
 	void ApplyData(Record_t record, CBaseEntity* pEntity);
+	/* restores the original data */
 	void RestoreData(CBaseEntity* pEntity);
+	/* amount of lerp on the client */
 	float GetLerp();
-	bool IsValid(float flSimtime, CBaseEntity* pLocal);
-	std::array<std::deque<Record_t>, 65> m_arrRecords;
+	/* returns true if the simtime is viable for lagcompensation */
+	bool IsValid(float flSimtime);
+	/* draw a pill hitbox on the record */
+	void DrawHitbox(std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix, studiohdr_t* pModel);
 
+	Record_t m_BestRecord;
+	float	 m_flBestRecordDelta;
 private:
+	/* returns true if an entity is a valid backtrack target */
 	bool IsValid(CBaseEntity* pLocal, CBaseEntity* pEntity);
-	CBaseEntity* GetBestEntity(CBaseEntity* pLocal);
+	/* returns the best hitbox position */
 	Vector GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix);
 
-	OriginalData_t m_orgData;
+	/* member variables */
+	OriginalData_t m_orgData; // original data of the entity we're backtracking 
+	/* cvars */
 	CConVar* m_cl_updaterate;
 	CConVar* m_sv_minupdaterate;
 	CConVar* m_sv_maxupdaterate;
@@ -114,4 +128,5 @@ private:
 	CConVar* m_sv_client_min_interp_ratio;
 	CConVar* m_sv_client_max_interp_ratio;
 	CConVar* m_sv_maxunlag;
+	std::array<std::deque<Record_t>, 65> m_arrRecords; // main array 
 };

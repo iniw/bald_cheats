@@ -329,10 +329,6 @@ bool FASTCALL H::hkCreateMove(IClientModeShared* thisptr, int edx, float flInput
 	G::bSendPacket = bSendPacket;
 	
 	// @note: i seen many times this mistake and please do not set/clamp angles here cuz u get confused with psilent aimbot later!
-	
-	// THIS SMELLS LIKE SHIT !!! IT'S FUCKING DIRTY HOLY SHIIIIT
-	if(C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_DECALS))
-		I::Engine->ExecuteClientCmd(XorStr("r_cleardecals"));
 
 	return false;
 }
@@ -401,6 +397,11 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 
 	if (pLocal == nullptr)
 		return oFrameStageNotify(thisptr, edx, stage);
+
+
+	// THIS SMELLS LIKE SHIT !!! IT'S FUCKING DIRTY HOLY SHIIIIT
+	if (C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_DECALS))
+		I::Engine->ExecuteClientCmd(XorStr("r_cleardecals"));
 
 	static QAngle angAimPunchOld = { }, angViewPunchOld = { };
 
@@ -913,9 +914,18 @@ void P::Sequence(const CRecvProxyData* pData, void* pStruct, void* pOut)
 {
 	static auto oSequence = RVP::Sequence->GetOriginal();
 
+	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
+
+	if (pLocal == nullptr || !pLocal->IsAlive())
+		return oSequence(pData, pStruct, pOut);
+
 	CBaseViewModel* pViewmodel = static_cast<CBaseViewModel*>(pStruct);
+	if (pViewmodel == nullptr)
+		return oSequence(pData, pStruct, pOut);
 
 	CRecvProxyData* pModifiableData = const_cast<CRecvProxyData*>(pData);
+	if (pModifiableData == nullptr)
+		return oSequence(pData, pStruct, pOut);
 
 	if (!CSkinChanger::Get().FixSequences(pModifiableData, pViewmodel))
 		return oSequence(pData, pStruct, pOut);
