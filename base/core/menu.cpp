@@ -299,6 +299,7 @@ void T::Visuals()
 						ImGui::ColorCheckbox(XorStr("visualize backtrack##player"), &C::Get<bool>(Vars.bEspMainPlayerBacktrack), &C::Get<Color>(Vars.colEspMainPlayerBacktrack));
 						ImGui::ColorCheckbox(XorStr("name##player"), &C::Get<bool>(Vars.bEspMainPlayerName), &C::Get<Color>(Vars.colEspMainPlayerName));
 						ImGui::ColorCheckbox(XorStr("flash timer##player"), &C::Get<bool>(Vars.bEspMainPlayerFlash), &C::Get<Color>(Vars.colEspMainPlayerFlash));
+						ImGui::ColorCheckbox(XorStr("nadekill indicator##player"), &C::Get<bool>(Vars.bEspMainPlayerNadeKill), &C::Get<Color>(Vars.colEspMainPlayerNadeKill));
 						ImGui::ColorCheckbox(XorStr("weapon text##player"), &C::Get<bool>(Vars.bEspMainPlayerWeaponText), &C::Get<Color>(Vars.colEspMainPlayerWeaponText));
 						ImGui::ColorCheckbox(XorStr("weapon icon##player"), &C::Get<bool>(Vars.bEspMainPlayerWeaponIcon), &C::Get<Color>(Vars.colEspMainPlayerWeaponIcon));
 						ImGui::ColorCheckbox(XorStr("ammo##player"), &C::Get<bool>(Vars.bEspMainPlayerAmmo), &C::Get<Color>(Vars.colEspMainPlayerAmmo));
@@ -563,6 +564,7 @@ void T::Miscellaneous()
 			ImGui::Checkbox(XorStr("unlock inventory"), &C::Get<bool>(Vars.bMiscUnlockInventory));
 			ImGui::Checkbox(XorStr("auto accept"), &C::Get<bool>(Vars.bMiscAutoAccept));
 			ImGui::Checkbox(XorStr("auto pistol"), &C::Get<bool>(Vars.bMiscAutoPistol));
+			ImGui::HotKey(XorStr("blockbot"), &C::Get<int>(Vars.iMiscBlockBotKey));
 			//ImGui::Checkbox(XorStr("anti-untrusted"), &C::Get<bool>(Vars.bMiscAntiUntrusted));
 			ImGui::PopStyleVar();
 

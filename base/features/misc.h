@@ -30,6 +30,8 @@ private:
 	// Movement
 	/* automatic jump when steps on the ground */
 	void BunnyHop(CUserCmd* pCmd, CBaseEntity* pLocal);
+	/* blocks the enemy closest to you */
+	void BlockBot(CUserCmd* pCmd, CBaseEntity* pLocal);
 	/* strafes on optimal sides for maximum speed in air */
 	void AutoStrafe(CUserCmd* pCmd, CBaseEntity* pLocal);
 	/* prevent stamina for epic movement clips */

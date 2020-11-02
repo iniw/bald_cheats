@@ -132,8 +132,6 @@ void CBacktracking::Update(CBaseEntity* pLocal)
 		if (!m_arrRecords[i].empty() && m_arrRecords[i].front().flSimtime == pEntity->GetSimulationTime())
 			continue;
 
-		Vector vecOldAbsOrigin = pEntity->GetAbsOrigin();
-
 		Record_t Record = { };
 
 		*(Vector*)((uintptr_t)pEntity + 0xA0) = pEntity->GetOrigin();
@@ -142,18 +140,14 @@ void CBacktracking::Update(CBaseEntity* pLocal)
 		pEntity->InvalidateBoneCache();
 
 		if (!pEntity->SetupBones(Record.arrMatrix.data(), MAXSTUDIOBONES, BONE_USED_BY_ANYTHING, I::Globals->flCurrentTime))
-			continue;
+			continue;	
 
 		Record.vecHitboxPos	 = GetBestHitbox(pLocal, pEntity, Record.arrMatrix);
 		Record.flSimtime	 = pEntity->GetSimulationTime();
 		Record.vecOrigin	 = pEntity->GetOrigin();
 		Record.vecAbsOrigin	 = pEntity->GetAbsOrigin();
-		Record.vecHeadPos	 = pEntity->GetHitboxPosition(HITBOX_HEAD, Record.arrMatrix);
-		Record.vecMins		 = pEntity->GetVecMins();
-		Record.vecMaxs		 = pEntity->GetVecMaxs();
-		Record.angAbsAngles	 = pEntity->GetAbsAngles();
+		Record.vecHeadPos	 = pEntity->GetHitboxPosition(HITBOX_HEAD, Record.arrMatrix);	
 		Record.pModel		 = I::ModelInfo->GetStudioModel(pEntity->GetModel());
-		Record.vecViewOffset = pEntity->GetViewOffset();
 
 		m_arrRecords[i].push_front(Record);
 
@@ -166,7 +160,7 @@ void CBacktracking::Update(CBaseEntity* pLocal)
 
 		m_arrRecords[i].erase(invalid, std::cend(m_arrRecords[i]));
 
-		while (m_arrRecords[i].size() > std::clamp(TIME_TO_TICKS(C::Get<int>(Vars.iBacktrackingTime) / 1000.f), 0, 12))
+		while (m_arrRecords[i].size() > TIME_TO_TICKS(C::Get<int>(Vars.iBacktrackingTime) / 1000.f))
 			m_arrRecords[i].pop_back();
 	}
 }
@@ -351,29 +345,17 @@ void CBacktracking::ApplyData(Record_t record, CBaseEntity* pEntity)
 	m_orgData.flSimtime		= pEntity->GetSimulationTime();
 	m_orgData.vecOrigin		= pEntity->GetOrigin();
 	m_orgData.vecAbsOrigin	= pEntity->GetAbsOrigin();
-	m_orgData.vecMins		= pEntity->GetVecMins();
-	m_orgData.vecMaxs		= pEntity->GetVecMaxs();
-	m_orgData.vecViewOffset = pEntity->GetViewOffset();
-	m_orgData.angAbsAngles	= pEntity->GetAbsAngles();
 	
 	pEntity->SetAbsOrigin(record.vecAbsOrigin);
-	pEntity->SetAbsAngles(record.angAbsAngles);
+	pEntity->GetOrigin() = record.vecOrigin;
 	pEntity->GetSimulationTime() = record.flSimtime;
-	pEntity->GetOrigin()		 = record.vecOrigin;
-	pEntity->GetVecMins()		 = record.vecMins;
-	pEntity->GetVecMaxs()		 = record.vecMaxs;
-	pEntity->GetViewOffset()	 = record.vecViewOffset;
 }
 
 void CBacktracking::RestoreData(CBaseEntity* pEntity)
 {
 	pEntity->SetAbsOrigin(m_orgData.vecAbsOrigin);
-	pEntity->SetAbsAngles(m_orgData.angAbsAngles);
-	pEntity->GetSimulationTime() = m_orgData.flSimtime;
 	pEntity->GetOrigin() = m_orgData.vecOrigin;
-	pEntity->GetVecMins() = m_orgData.vecMins;
-	pEntity->GetVecMaxs() = m_orgData.vecMaxs;
-	pEntity->GetViewOffset() = m_orgData.vecViewOffset;
+	pEntity->GetSimulationTime() = m_orgData.flSimtime;
 }
 
 std::deque<Record_t> CBacktracking::GetPlayerRecord(int iIndex)

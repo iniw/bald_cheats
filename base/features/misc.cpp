@@ -28,6 +28,9 @@ void CMiscellaneous::Run(CUserCmd* pCmd, CBaseEntity* pLocal, bool& bSendPacket)
 	if (C::Get<bool>(Vars.bMiscAutoStrafe))
 		AutoStrafe(pCmd, pLocal);
 
+	if (C::Get<int>(Vars.iMiscBlockBotKey) && IPT::IsKeyDown(C::Get<int>(Vars.iMiscBlockBotKey)))
+		BlockBot(pCmd, pLocal);
+
 	if (C::Get<bool>(Vars.bMiscRevealRanks) && pCmd->iButtons & IN_SCORE)
 		I::Client->DispatchUserMessage(CS_UM_ServerRankRevealAll, 0U, 0, nullptr);
 }
@@ -198,6 +201,45 @@ void CMiscellaneous::BunnyHop(CUserCmd* pCmd, CBaseEntity* pLocal)
 		bLastJumped = false;
 		bShouldFake = false;
 	}
+}
+
+void CMiscellaneous::BlockBot(CUserCmd* pCmd, CBaseEntity* pLocal)
+{
+	float flBestDistance = 250.f;
+	CBaseEntity* pBestEntity = nullptr;
+
+	for (int i = 1; i < I::Globals->nMaxClients; i++)
+	{
+		if (i == I::Engine->GetLocalPlayer())
+			continue;
+
+		CBaseEntity* pEntity = I::ClientEntityList->Get<CBaseEntity>(i);
+
+		if (pEntity == nullptr || !pEntity->IsAlive() || pEntity->IsDormant())
+			continue;
+
+		float flDistance = pLocal->GetOrigin().DistTo(pEntity->GetOrigin());
+
+		if (flDistance < flBestDistance)
+		{
+			flBestDistance = flDistance;
+			pBestEntity = pEntity;
+		}
+	}
+
+	if (pBestEntity == nullptr)
+		return;
+
+	QAngle angAngle = M::CalcAngle(pLocal->GetOrigin(), pBestEntity->GetOrigin());
+
+	angAngle.y -= pLocal->GetEyeAngles().y;
+	angAngle.Normalize();
+	//angAngle.Clamp();
+
+	if (angAngle.y < 0.0f)
+		pCmd->flSideMove = 450.f;
+	else if (angAngle.y > 0.0f)
+		pCmd->flSideMove = -450.f;
 }
 
 void CMiscellaneous::AutoStrafe(CUserCmd* pCmd, CBaseEntity* pLocal)

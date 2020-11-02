@@ -395,7 +395,8 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 		const Color colVisible = C::Get<Color>(Vars.colEspChamsEnemiesVisible);
 		const Color colWall = C::Get<Color>(Vars.colEspChamsEnemiesWall);
 		const Color colBacktrack = C::Get<Color>(Vars.colEspChamsEnemiesBacktrack);
-
+		
+		/* backtrack chams*/
 		if (C::Get<bool>(Vars.bEspChamsBacktrack) && C::Get<bool>(Vars.bEspChamsEnemiesBacktrack))
 		{
 			std::deque deqRecords = CBacktracking::Get().GetPlayerRecord(pEntity->GetIndex());
@@ -405,7 +406,10 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 				{
 					for (auto& record : deqRecords)
 					{
-						if (record.vecOrigin == pEntity->GetOrigin())
+						if (!CBacktracking::Get().IsValid(record.flSimtime))
+							continue;
+
+						if (record.vecOrigin == pEntity->GetOrigin()) // if the record is going to overlay the player
 						{
 							//restore material
 							I::StudioRender->ForcedMaterialOverride(nullptr);
@@ -439,7 +443,7 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 				else
 				{
 					auto record = deqRecords[deqRecords.size() - 1];
-
+					
 					// set color
 					pMaterialBacktrack->ColorModulate(colBacktrack.rBase(), colBacktrack.gBase(), colBacktrack.bBase());
 
@@ -469,7 +473,7 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 
 		if (C::Get<bool>(Vars.bEspChamsEnemies))
 		{
-			/* chams through walls */
+			/* xqz chams */
 			if (C::Get<bool>(Vars.bEspChamsEnemiesWall))
 			{
 				// set xqz color
@@ -536,8 +540,6 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 		pSleeveMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
 		I::StudioRender->ForcedMaterialOverride(pSleeveMaterial);
 
-		// then draw original model with our flags
-
 		// we need to clear override
 		return true;
 	}
@@ -556,8 +558,6 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 		{
 			pViewModelMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
 			I::StudioRender->ForcedMaterialOverride(pViewModelMaterial);
-
-			// then draw original model with our flags
 
 			// we need to clear override
 			return true;
@@ -1360,11 +1360,14 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 		{
 			for (auto& record : deqRecords)
 			{
+				if (!CBacktracking::Get().IsValid(record.flSimtime)) // only draw valid records
+					continue;
+
 				Vector2D vecScreen = { };
 				if (!D::WorldToScreen(record.vecHeadPos, vecScreen))
 					return;
 
-				D::AddCircle(ImVec2(vecScreen.x, vecScreen.y), 1.f, C::Get<Color>(Vars.colEspMainPlayerBacktrack), 12, IMGUI_CIRCLE_FILLED);
+				D::AddRect(ImVec2(vecScreen.x - 0.5f, vecScreen.y - 0.5f), ImVec2(vecScreen.x + 0.5f, vecScreen.y + 0.5f), C::Get<Color>(Vars.colEspMainPlayerBacktrack), IMGUI_RECT_FILLED);
 			}
 		}
 	}
@@ -1390,6 +1393,15 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 
 		D::AddText(F::SegoeUI, flMainFontSize, ImVec2(ctx.box.left + ctx.box.width * 0.5f - vecNameSize.x * 0.5f, ctx.box.top - 2 - vecNameSize.y - ctx.arrPadding.at(DIR_TOP)), szName, C::Get<Color>(Vars.colEspMainPlayerName), IMGUI_TEXT_DROPSHADOW, colOutline);
 		ctx.arrPadding.at(DIR_TOP) += vecNameSize.y;
+	}
+
+	if (C::Get<bool>(Vars.bEspMainPlayerNadeKill) && pEntity->GetHealth() < 5)
+	{
+		std::string szText = "nadekill";
+		const ImVec2 vecTextSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szText.c_str());
+
+		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.left + ctx.box.width * 0.5f - vecTextSize.x * 0.5f, ctx.box.top - 2 - vecTextSize.y - ctx.arrPadding.at(DIR_TOP)), szText, C::Get<Color>(Vars.colEspMainPlayerNadeKill), IMGUI_TEXT_DROPSHADOW, colOutline);
+		ctx.arrPadding.at(DIR_TOP) += vecTextSize.y;
 	}
 	#pragma endregion
 
@@ -1435,15 +1447,6 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 				}
 			}
 		}
-	}
-
-	if (C::Get<bool>(Vars.bEspMainPlayerDistance))
-	{
-		const int iDistance = static_cast<int>(M_INCH2METRE(flDistance));
-		std::string szDistance = std::to_string(iDistance).append(XorStr("m"));
-		const ImVec2 vecDistanceSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szDistance.c_str());
-		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.left + ctx.box.width * 0.5f - vecDistanceSize.x * 0.5f, ctx.box.top - 2 - vecDistanceSize.y - ctx.arrPadding.at(DIR_TOP)), szDistance, colInfo, IMGUI_TEXT_DROPSHADOW, Color(0, 0, 0, 200));
-		ctx.arrPadding.at(DIR_TOP) += vecDistanceSize.y;
 	}
 	#pragma endregion
 

@@ -204,11 +204,12 @@ struct Variables_t
 	C_ADD_VARIABLE(bool, bEspMainPlayerOverrideHealthColor, false);
 
 	/* top */
-	C_ADD_VARIABLE(bool, bEspMainPlayerRank, false);
 	C_ADD_VARIABLE(bool, bEspMainPlayerName, false);
 	C_ADD_VARIABLE(Color, colEspMainPlayerName, Color(255, 255, 255, 255));
 	C_ADD_VARIABLE(bool, bEspMainPlayerFlash, false);
 	C_ADD_VARIABLE(Color, colEspMainPlayerFlash, Color(255, 255, 255, 255));
+	C_ADD_VARIABLE(bool, bEspMainPlayerNadeKill, false);
+	C_ADD_VARIABLE(Color, colEspMainPlayerNadeKill, Color(255, 255, 255, 255));
 
 	/* right */
 	C_ADD_VARIABLE_VECTOR(bool, INFO_FLAG_MAX, vecEspMainPlayerFlags, false);
@@ -334,6 +335,7 @@ struct Variables_t
 	// general
 	C_ADD_VARIABLE(bool, bMiscAutoAccept, false);
 	C_ADD_VARIABLE(bool, bMiscAutoPistol, false);
+	C_ADD_VARIABLE(int, iMiscBlockBotKey, 0);
 	C_ADD_VARIABLE(bool, bMiscPingSpike, false);
 	C_ADD_VARIABLE(int, iMiscLatencyFactor, 100);
 	C_ADD_VARIABLE(bool, bMiscRevealRanks, false);

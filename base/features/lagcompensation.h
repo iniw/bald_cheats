@@ -70,10 +70,6 @@ struct Record_t
 	Vector vecHeadPos;
 	Vector vecOrigin;
 	Vector vecAbsOrigin;
-	Vector vecMins;
-	Vector vecMaxs;
-	Vector vecViewOffset;
-	QAngle angAbsAngles;
 	studiohdr_t* pModel;
 	std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix;
 };
@@ -83,10 +79,6 @@ struct OriginalData_t
 	float flSimtime;
 	Vector vecOrigin;
 	Vector vecAbsOrigin;
-	Vector vecMins;
-	Vector vecMaxs;
-	Vector vecViewOffset;
-	QAngle angAbsAngles;
 };
 
 class CBacktracking : public CSingleton<CBacktracking>
