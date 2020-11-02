@@ -916,7 +916,7 @@ public:
 	#pragma endregion
 };
 
-class CBaseViewModel : public IClientEntity
+class CBaseViewModel : public CBaseEntity
 {
 public:
 	#pragma region DT_BaseViewModel

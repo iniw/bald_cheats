@@ -289,10 +289,8 @@ bool FASTCALL H::hkCreateMove(IClientModeShared* thisptr, int edx, float flInput
 		if (C::Get<bool>(Vars.bTrigger))
 			CTriggerBot::Get().Run(pCmd, pLocal);
 
-		#if 0
 		if (C::Get<bool>(Vars.bBacktracking))
 			CBacktracking::Get().Run(pCmd, pLocal);
-		#endif
 	}
 	CPrediction::Get().End(pCmd, pLocal);
 

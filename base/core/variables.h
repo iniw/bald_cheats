@@ -193,7 +193,8 @@ struct Variables_t
 	C_ADD_VARIABLE(Color, colEspMainPlayerBox, Color(255, 255, 255, 255));
 	C_ADD_VARIABLE(bool, bEspMainPlayerSkeleton, false);
 	C_ADD_VARIABLE(Color, colEspMainPlayerSkeleton, Color(255, 255, 255, 255));
-
+	C_ADD_VARIABLE(bool, bEspMainPlayerBacktrack, false);
+	C_ADD_VARIABLE(Color, colEspMainPlayerBacktrack, Color(255, 255, 255, 255));
 	C_ADD_VARIABLE(bool, bEspMainPlayerRadar, false);
 	C_ADD_VARIABLE(bool, bEspMainPlayerInfo, false);
 
@@ -274,6 +275,7 @@ struct Variables_t
 	C_ADD_VARIABLE(bool, bEspChams, false);
 	C_ADD_VARIABLE(bool, bEspChamsEnemies, false);
 	C_ADD_VARIABLE(bool, bEspChamsViewModel, false);
+	C_ADD_VARIABLE(bool, bEspChamsBacktrack, false)
 
 	C_ADD_VARIABLE(bool, bEspChamsEnemiesVisible, false);
 	C_ADD_VARIABLE(Color, colEspChamsEnemiesVisible, Color(180, 65, 65, 255));
@@ -281,9 +283,15 @@ struct Variables_t
 	C_ADD_VARIABLE(Color, colEspChamsEnemiesWall, Color(180, 180, 40, 255));
 	C_ADD_VARIABLE(int, iEspChamsEnemiesVisible, static_cast<int>(EVisualsEnemiesChams::COVERED));
 	C_ADD_VARIABLE(int, iEspChamsEnemiesWall, static_cast<int>(EVisualsEnemiesChams::COVERED));
+
 	C_ADD_VARIABLE(int, iEspChamsViewModel, static_cast<int>(EVisualsViewModelChams::WIREFRAME));
 	C_ADD_VARIABLE(Color, colEspChamsViewModel, Color(80, 255, 45, 255));
 	C_ADD_VARIABLE(Color, colEspChamsViewModelAdditional, Color(0, 0, 255, 255));
+
+	C_ADD_VARIABLE(int, iEspChamsBacktrackType, 0);
+	C_ADD_VARIABLE(bool, bEspChamsEnemiesBacktrack, false);
+	C_ADD_VARIABLE(Color, colEspChamsEnemiesBacktrack, Color(25, 25, 25, 75));
+	C_ADD_VARIABLE(int, iEspChamsEnemiesBacktrack, static_cast<int>(EVisualsEnemiesChams::COVERED));
 
 	// world
 	C_ADD_VARIABLE(bool, bWorldNightMode, false);

@@ -265,6 +265,7 @@ void T::Visuals()
 					{
 						ImGui::MenuItem(XorStr("enemies"), nullptr, &C::Get<bool>(Vars.bEspChamsEnemies));
 						ImGui::MenuItem(XorStr("viewmodel"), nullptr, &C::Get<bool>(Vars.bEspChamsViewModel));
+						ImGui::MenuItem(XorStr("backtrack"), nullptr, &C::Get<bool>(Vars.bEspChamsBacktrack));
 						break;
 					}
 					default:
@@ -295,6 +296,7 @@ void T::Visuals()
 						ImGui::ColorCheckbox(XorStr("override health color##player"), &C::Get<bool>(Vars.bEspMainPlayerOverrideHealthColor), &C::Get<Color>(Vars.colEspMainPlayerHealth));
 						ImGui::ColorCheckbox(XorStr("box##player"), &C::Get<bool>(Vars.bEspMainPlayerBox), &C::Get<Color>(Vars.colEspMainPlayerBox));
 						ImGui::ColorCheckbox(XorStr("skeleton##player"), &C::Get<bool>(Vars.bEspMainPlayerSkeleton), &C::Get<Color>(Vars.colEspMainPlayerSkeleton));
+						ImGui::ColorCheckbox(XorStr("visualize backtrack##player"), &C::Get<bool>(Vars.bEspMainPlayerBacktrack), &C::Get<Color>(Vars.colEspMainPlayerBacktrack));
 						ImGui::ColorCheckbox(XorStr("name##player"), &C::Get<bool>(Vars.bEspMainPlayerName), &C::Get<Color>(Vars.colEspMainPlayerName));
 						ImGui::ColorCheckbox(XorStr("flash timer##player"), &C::Get<bool>(Vars.bEspMainPlayerFlash), &C::Get<Color>(Vars.colEspMainPlayerFlash));
 						ImGui::ColorCheckbox(XorStr("weapon text##player"), &C::Get<bool>(Vars.bEspMainPlayerWeaponText), &C::Get<Color>(Vars.colEspMainPlayerWeaponText));
@@ -418,6 +420,20 @@ void T::Visuals()
 						ImGui::ColorCheckbox(XorStr("non-visible##chamsenemies"), &C::Get<bool>(Vars.bEspChamsEnemiesWall), &C::Get<Color>(Vars.colEspChamsEnemiesWall));
 						ImGui::Combo(XorStr("non-visible material##chamsenemies"), &C::Get<int>(Vars.iEspChamsEnemiesWall), XorStr("covered\0flat\0wireframe\0reflective\0\0"));
 						flEnemiesChildSize = ImGui::GetCursorPosY() + style.ItemSpacing.y;
+						ImGui::EndChild();
+					}
+				}
+
+				if (C::Get<bool>(Vars.bEspChamsBacktrack))
+				{
+					static float flEnemiesBacktrackChildSize = 0.f;
+					ImGui::BeginChild("chams.backtrack", ImVec2(0, flEnemiesBacktrackChildSize), true, ImGuiWindowFlags_NoTitleBar);
+					{
+						ImGui::Text(XorStr("backtrack"));
+						ImGui::Combo(XorStr("type##chamsbacktrack"), &C::Get<int>(Vars.iEspChamsBacktrackType), XorStr("all records\0last record\0\0"));
+						ImGui::ColorCheckbox(XorStr("enable##chamsbacktrack"), &C::Get<bool>(Vars.bEspChamsEnemiesBacktrack), &C::Get<Color>(Vars.colEspChamsEnemiesBacktrack));
+						ImGui::Combo(XorStr("material##chamsbacktrack"), &C::Get<int>(Vars.iEspChamsEnemiesBacktrack), XorStr("covered\0flat\0wireframe\0reflective\0\0"));
+						flEnemiesBacktrackChildSize = ImGui::GetCursorPosY() + style.ItemSpacing.y;
 						ImGui::EndChild();
 					}
 				}

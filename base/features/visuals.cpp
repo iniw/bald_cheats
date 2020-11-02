@@ -189,20 +189,6 @@ void CVisuals::Store()
 				if (!GetBoundingBox(pEntity, &ctx.box))
 					break;
 
-				std::deque deqPlayerRecords = CBacktracking::Get().GetPlayerRecord(pEntity->GetIndex());
-
-				if (!deqPlayerRecords.empty())
-				{
-					for (auto& record : deqPlayerRecords)
-					{
-						Vector2D vecScreen = { };
-						if (!D::WorldToScreen(record.vecHeadPos, vecScreen))
-							continue;
-
-						D::AddCircle(ImVec2(vecScreen.x, vecScreen.y), 1.f, Color(255, 255, 255, 255), 12, IMGUI_CIRCLE_FILLED);
-					}
-				}
-
 				Player(pLocal, pEntity, ctx, flDistance, Color(255, 255, 255, 255), Color(20, 20, 20, 150), Color(0, 0, 0, 220));			
 			}
 
@@ -349,65 +335,149 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 	std::string_view szModelName = info.pStudioHdr->szName;
 
 	// check for players
-	if (pEntity->IsPlayer() && pEntity->IsAlive() && (C::Get<bool>(Vars.bEspChamsEnemies)))
+	if (pEntity->IsPlayer() && pEntity->IsAlive() && pLocal->IsEnemy(pEntity))
 	{
 		// skip glow models
 		if (nFlags & (STUDIO_RENDER | STUDIO_SKIP_FLEXES | STUDIO_DONOTMODIFYSTENCILSTATE | STUDIO_NOLIGHTING_OR_CUBEMAP | STUDIO_SKIP_DECALS))
 			return false;
 
-		// team filters check
-		if ((pLocal->IsEnemy(pEntity) && C::Get<bool>(Vars.bEspChamsEnemies)))
+		static IMaterial* pMaterial = nullptr;
+		static IMaterial* pMaterialWall = nullptr;
+		static IMaterial* pMaterialBacktrack = nullptr;
+
+		// set players material
+		// set visible players material
+		switch (C::Get<int>(Vars.iEspChamsEnemiesVisible))
 		{
-			static IMaterial* pMaterial = nullptr;
-			static IMaterial* pMaterialWall = nullptr;
+		case (int)EVisualsEnemiesChams::FLAT:
+			pMaterial = arrMaterials.at(0).second;
+			break;
+		case (int)EVisualsEnemiesChams::REFLECTIVE:
+			pMaterial = arrMaterials.at(2).first;
+			break;
+		default:
+			pMaterial = arrMaterials.at(0).first;
+			break;
+		}
 
-			// set players material
-			// set visible players material
-			switch (C::Get<int>(Vars.iEspChamsEnemiesVisible))
+		// set invisible players material
+		switch (C::Get<int>(Vars.iEspChamsEnemiesWall))
+		{
+		case (int)EVisualsEnemiesChams::FLAT:
+			pMaterialWall = arrMaterials.at(0).second;
+			break;
+		case (int)EVisualsEnemiesChams::REFLECTIVE:
+			pMaterialWall = arrMaterials.at(2).first;
+			break;
+		default:
+			pMaterialWall = arrMaterials.at(0).first;
+			break;
+		}
+
+		switch (C::Get<int>(Vars.iEspChamsEnemiesBacktrack))
+		{
+		case (int)EVisualsEnemiesChams::FLAT:
+			pMaterialBacktrack = arrMaterials.at(0).second;
+			break;
+		case (int)EVisualsEnemiesChams::REFLECTIVE:
+			pMaterialBacktrack = arrMaterials.at(2).first;
+			break;
+		default:
+			pMaterialBacktrack = arrMaterials.at(0).first;
+			break;
+		}
+
+		// check is valid material
+		if (pMaterial == nullptr || pMaterial->IsErrorMaterial() || pMaterialWall == nullptr || pMaterialWall->IsErrorMaterial() || pMaterialBacktrack == nullptr || pMaterialBacktrack->IsErrorMaterial())
+			return false;
+
+		// get colors
+		const Color colVisible = C::Get<Color>(Vars.colEspChamsEnemiesVisible);
+		const Color colWall = C::Get<Color>(Vars.colEspChamsEnemiesWall);
+		const Color colBacktrack = C::Get<Color>(Vars.colEspChamsEnemiesBacktrack);
+
+		if (C::Get<bool>(Vars.bEspChamsBacktrack) && C::Get<bool>(Vars.bEspChamsEnemiesBacktrack))
+		{
+			std::deque deqRecords = CBacktracking::Get().GetPlayerRecord(pEntity->GetIndex());
+			if (!deqRecords.empty())
 			{
-			case (int)EVisualsEnemiesChams::FLAT:
-				pMaterial = arrMaterials.at(0).second;
-				break;
-			case (int)EVisualsEnemiesChams::REFLECTIVE:
-				pMaterial = arrMaterials.at(2).first;
-				break;
-			default:
-				pMaterial = arrMaterials.at(0).first;
-				break;
+				if (C::Get<int>(Vars.iEspChamsBacktrackType) == 0)
+				{
+					for (auto& record : deqRecords)
+					{
+						if (record.vecOrigin == pEntity->GetOrigin())
+						{
+							//restore material
+							I::StudioRender->ForcedMaterialOverride(nullptr);
+
+							// draw original player
+							oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
+
+							// skip this record
+							continue;
+						}
+
+						// set color
+						pMaterialBacktrack->ColorModulate(colBacktrack.rBase(), colBacktrack.gBase(), colBacktrack.bBase());
+
+						// set alpha
+						pMaterialBacktrack->AlphaModulate(colBacktrack.aBase());
+
+						// disable "$ignorez" flag
+						pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+
+						// set wireframe
+						pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, C::Get<int>(Vars.iEspChamsEnemiesBacktrack) == (int)EVisualsEnemiesChams::WIREFRAME ? true : false);
+
+						// override customized material
+						I::StudioRender->ForcedMaterialOverride(pMaterialBacktrack);
+
+						// draw material
+						oDrawModel(I::StudioRender, 0, pResults, info, record.arrMatrix.data(), flFlexWeights, flFlexDelayedWeights, record.vecOrigin, nFlags);
+					}
+				}
+				else
+				{
+					auto record = deqRecords[deqRecords.size() - 1];
+
+					// set color
+					pMaterialBacktrack->ColorModulate(colBacktrack.rBase(), colBacktrack.gBase(), colBacktrack.bBase());
+
+					// set alpha
+					pMaterialBacktrack->AlphaModulate(colBacktrack.aBase());
+
+					// disable "$ignorez" flag
+					pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+
+					// set wireframe
+					pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, C::Get<int>(Vars.iEspChamsEnemiesBacktrack) == (int)EVisualsEnemiesChams::WIREFRAME ? true : false);
+
+					// override customized material
+					I::StudioRender->ForcedMaterialOverride(pMaterialBacktrack);
+
+					// draw material
+					oDrawModel(I::StudioRender, 0, pResults, info, record.arrMatrix.data(), flFlexWeights, flFlexDelayedWeights, record.vecOrigin, nFlags);
+
+					// restore material
+					I::StudioRender->ForcedMaterialOverride(nullptr);
+
+					// draw original player
+					oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
+				}
 			}
+		}
 
-			// set invisible players material
-			switch (C::Get<int>(Vars.iEspChamsEnemiesWall))
-			{
-			case (int)EVisualsEnemiesChams::FLAT:
-				pMaterialWall = arrMaterials.at(0).second;
-				break;
-			case (int)EVisualsEnemiesChams::REFLECTIVE:
-				pMaterialWall = arrMaterials.at(2).first;
-				break;
-			default:
-				pMaterialWall = arrMaterials.at(0).first;
-				break;
-			}
-
-			// check is valid material
-			if (pMaterial == nullptr || pMaterial->IsErrorMaterial() || pMaterialWall == nullptr || pMaterialWall->IsErrorMaterial())
-				return false;
-
-			// get colors
-			const Color colVisible = C::Get<Color>(Vars.colEspChamsEnemiesVisible);
-			const Color colWall = C::Get<Color>(Vars.colEspChamsEnemiesWall);
-
+		if (C::Get<bool>(Vars.bEspChamsEnemies))
+		{
 			/* chams through walls */
 			if (C::Get<bool>(Vars.bEspChamsEnemiesWall))
 			{
-
 				// set xqz color
 				pMaterialWall->ColorModulate(colWall.rBase(), colWall.gBase(), colWall.bBase());
 
 				// set xqz alpha
 				pMaterialWall->AlphaModulate(colWall.aBase());
-				
+
 				// enable "$ignorez" flag and it enables ignore the z axis
 				pMaterialWall->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, true);
 
@@ -447,11 +517,12 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 
 				// draw material
 				oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
-
-				return true;
 			}
 		}
+
+		return true;
 	}
+
 	// check for viewmodel sleeves
 	else if (szModelName.find(XorStr("sleeve")) != std::string_view::npos && C::Get<bool>(Vars.bEspChamsViewModel) && C::Get<int>(Vars.iEspChamsViewModel) == (int)EVisualsViewModelChams::NO_DRAW)
 	{
@@ -1282,6 +1353,22 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 	if (C::Get<bool>(Vars.bEspMainPlayerSkeleton))
 		Skeleton(pEntity);
 
+	if (C::Get<bool>(Vars.bEspMainPlayerBacktrack))
+	{
+		std::deque deqRecords = CBacktracking::Get().GetPlayerRecord(pEntity->GetIndex());
+		if (!deqRecords.empty())
+		{
+			for (auto& record : deqRecords)
+			{
+				Vector2D vecScreen = { };
+				if (!D::WorldToScreen(record.vecHeadPos, vecScreen))
+					return;
+
+				D::AddCircle(ImVec2(vecScreen.x, vecScreen.y), 1.f, C::Get<Color>(Vars.colEspMainPlayerBacktrack), 12, IMGUI_CIRCLE_FILLED);
+			}
+		}
+	}
+
 	const float flMainFontSize = 12.f;
 	const float flOtherFontSize = 10.f;
 	const float flFlagsFontSize = 8.f;
@@ -1373,7 +1460,7 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 	if (C::Get<std::vector<bool>>(Vars.vecEspMainPlayerFlags).at(INFO_FLAG_ARMOR) && pEntity->GetArmor() > 0)
 	{
 		const char* szArmorText = pEntity->HasHelmet() ? "hk" : "k";
-		const ImVec2 vecArmorSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szArmorText);						//Color(255, 75, 90)
+		const ImVec2 vecArmorSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szArmorText);
 		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.right + 2, ctx.box.top + ctx.arrPadding.at(DIR_RIGHT)), szArmorText, Color(255, 255, 255), IMGUI_TEXT_DROPSHADOW, colOutline);
 		ctx.arrPadding.at(DIR_RIGHT) += vecArmorSize.y;
 	}
@@ -1381,7 +1468,7 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 	if (C::Get<std::vector<bool>>(Vars.vecEspMainPlayerFlags).at(INFO_FLAG_KIT) && pEntity->HasDefuser())
 	{
 		constexpr const char* szKitText = "kit";
-		const ImVec2 vecKitSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szKitText);							//Color(50, 200, 170)
+		const ImVec2 vecKitSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szKitText);
 		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.right + 2, ctx.box.top + ctx.arrPadding.at(DIR_RIGHT)), szKitText, Color(255, 255, 255), IMGUI_TEXT_DROPSHADOW, colOutline);
 		ctx.arrPadding.at(DIR_RIGHT) += vecKitSize.y;
 	}
@@ -1389,7 +1476,7 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 	if (C::Get<std::vector<bool>>(Vars.vecEspMainPlayerFlags).at(INFO_FLAG_ZOOM) && pEntity->IsScoped())
 	{
 		constexpr const char* szScopedText = "scoped";
-		const ImVec2 vecScopedSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szScopedText);					//Color(160, 100, 200)
+		const ImVec2 vecScopedSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szScopedText);
 		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.right + 2, ctx.box.top + ctx.arrPadding.at(DIR_RIGHT)), szScopedText, Color(255, 255, 255), IMGUI_TEXT_DROPSHADOW, colOutline);
 		ctx.arrPadding.at(DIR_RIGHT) += vecScopedSize.y;
 	}
@@ -1421,7 +1508,6 @@ void CVisuals::HealthBar(Context_t& ctx, const float flFactor, const int iHealth
 void CVisuals::AmmoBar(CBaseEntity* pEntity, CBaseCombatWeapon* pWeapon, Context_t& ctx, const Color& colPrimary, const Color& colBackground, const Color& colOutline)
 {
 	CCSWeaponData* pWeaponData = I::WeaponSystem->GetWeaponData(pWeapon->GetItemDefinitionIndex());
-
 	if (pWeaponData == nullptr)
 		return;
 

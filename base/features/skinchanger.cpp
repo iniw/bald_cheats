@@ -21,6 +21,10 @@ void CSkinChanger::Run(CBaseEntity* pLocal)
 	if (pViewmodelWeapon == nullptr)
 		return;
 
+	CBaseWeaponWorldModel* pViewmodelWorld = I::ClientEntityList->GetFromHandle<CBaseWeaponWorldModel>(pViewmodelWeapon->GetWorldModelHandle());
+	if (pViewmodelWorld == nullptr)
+		return;
+
 	Weapons(pLocal);
 	Gloves(pLocal);
 
@@ -29,8 +33,8 @@ void CSkinChanger::Run(CBaseEntity* pLocal)
 	if (mapItemList.find(nActiveDefinitionIndex) == mapItemList.end())
 		return;	
 	
-	pViewmodel->SetWeaponModel(mapItemList[nActiveDefinitionIndex].szModel, pViewmodelWeapon);
-	pViewmodelWeapon->GetWorldModelIndex() = I::ModelInfo->GetModelIndex(mapItemList[nActiveDefinitionIndex].szModel);
+	pViewmodel->GetModelIndex() = I::ModelInfo->GetModelIndex(mapItemList[nActiveDefinitionIndex].szModel);
+	pViewmodelWorld->GetModelIndex() = I::ModelInfo->GetModelIndex(mapItemList[nActiveDefinitionIndex].szModel) + 1;
 	//pWorldModel->GetModelIndex() = I::ModelInfo->GetModelIndex(mapItemList[nActiveDefinitionIndex].szModel);
 }
 

@@ -23,7 +23,7 @@ struct Target_t
 	QAngle angAngle; // angle of the hitbox and our eyepos
 	float flAngleDelta; // delta of that angle
 	int iIndex;	// index of the entity
-	bool bShouldBacktrack = false; // true if aiming at a record is better than aiming at normal
+	bool bShouldAimAtBacktrack = false; // true if aiming at a record is better than aiming at normal
 	Record_t Record;
 };
 

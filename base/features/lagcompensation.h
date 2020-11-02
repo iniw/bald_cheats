@@ -108,14 +108,15 @@ public:
 	bool IsValid(float flSimtime);
 	/* draw a pill hitbox on the record */
 	void DrawHitbox(std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix, studiohdr_t* pModel);
-
-	Record_t m_BestRecord;
-	float	 m_flBestRecordDelta;
 private:
 	/* returns true if an entity is a valid backtrack target */
 	bool IsValid(CBaseEntity* pLocal, CBaseEntity* pEntity);
 	/* returns the best hitbox position */
 	Vector GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix);
+	/* returns the closest entity */
+	CBaseEntity* GetBestEntity(CBaseEntity* pLocal);
+	/* returns the best record for the entity at that index */
+	Record_t GetBestRecord(CBaseEntity* pLocal, int iIndex);
 
 	/* member variables */
 	OriginalData_t m_orgData; // original data of the entity we're backtracking 
