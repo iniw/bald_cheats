@@ -146,7 +146,7 @@ struct SkinchangerVariables_t
 		iQuality = 0;
 		bNameTag = false;
 		szNameTag = "";
-		flWear = 0.1f;
+		flWear = 0.0f;
 		iDefinitionIndex = 0;
 		iDefinitionIndexOverride = 0;
 	}
@@ -328,6 +328,7 @@ struct Variables_t
 	C_ADD_VARIABLE(int, iMiscJumpBugKey, 0);
 	C_ADD_VARIABLE(int, iMiscEdgeBugKey, 0);
 	C_ADD_VARIABLE(int, iMiscEdgeJumpKey, 0);
+	C_ADD_VARIABLE(bool, bMiscEdgeJumpLong, false);
 	C_ADD_VARIABLE(bool, bMiscNoCrouchCooldown, false);
 	C_ADD_VARIABLE(bool, bMiscVeloIndicator, false);
 	C_ADD_VARIABLE(Color, colMiscVeloIndicator, Color(255, 255, 255, 255));
@@ -348,7 +349,7 @@ struct Variables_t
 	C_ADD_VARIABLE(int, iSkinchangerKnife, 0);
 	C_ADD_VARIABLE(int, iSkinchangerGlove, 0);
 	C_ADD_VARIABLE(int, iSkinchangerPaintKit, 0);
-	C_ADD_VARIABLE_MAP(int, SkinchangerVariables_t, MAX_WEAPONS, mapSkinchangerVars, 0, SkinchangerVariables_t());
+	C_ADD_VARIABLE_MAP(int, SkinchangerVariables_t, mapSkinchangerVars, 0, SkinchangerVariables_t());
 #pragma endregion
 
 	#pragma region variables_menu

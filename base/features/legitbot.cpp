@@ -1,7 +1,5 @@
 #include "legitbot.h"
 
-// used: cheat variables
-#include "../core/variables.h"
 // used: main window open state
 #include "../core/menu.h"
 // used: key state
@@ -14,17 +12,19 @@
 #include "autowall.h"
 // used: GetTickbase()
 #include "../features/prediction.h"
+#include "../utilities/logging.h"
 
 void CLegitBot::Run(CUserCmd* pCmd, CBaseEntity* pLocal, bool& bSendPacket)
 {
-	if (pLocal != nullptr && pLocal->IsAlive() && !W::bMainOpened && GetWeaponType(pLocal) != -1)
-		C::Get<int>(Vars.iLegitWeapon) = m_iWeaponType = GetWeaponType(pLocal); // set the menu weapon as the one we're holding
+	if (!W::bMainOpened && GetWeaponType(pLocal) != -1)
+		 C::Get<int>(Vars.iLegitWeapon) = m_iWeaponType = GetWeaponType(pLocal); // set the menu weapon as the one we're holding
+
+	m_WeaponVars		 = C::Get<std::vector<LegitbotVariables_t>>(Vars.vecLegitVars)[m_iWeaponType];
+	m_angLocalViewAngles = I::Engine->GetViewAngles();
+	m_vecLocalEyePos	 = pLocal->GetEyePosition();
 
 	if (!ShouldRun(pLocal))
 		return;
-
-	m_angLocalViewAngles = I::Engine->GetViewAngles();
-	m_vecLocalEyePos	 = pLocal->GetEyePosition();
 
 	if (!GetTargetData(pLocal, m_Target))
 		return;
@@ -50,7 +50,7 @@ bool CLegitBot::GetTargetData(CBaseEntity* pLocal, Target_t& Target)
 	Target.iIndex = Target.pEntity->GetIndex();
 
 	std::deque<Record_t> deqRecords = CBacktracking::Get().GetPlayerRecord(Target.iIndex);
-	if (deqRecords.empty() || !C_GET_LEGITVAR(bAimAtBacktrack)) // if we shouldn't aim at backtrack, return
+	if (deqRecords.empty() || !m_WeaponVars.bAimAtBacktrack) // if we shouldn't aim at backtrack, return
 		return true;
 
 	float flBestDelta = Target.flAngleDelta;
@@ -59,10 +59,10 @@ bool CLegitBot::GetTargetData(CBaseEntity* pLocal, Target_t& Target)
 		if (!CBacktracking::Get().IsValid(record.flSimtime))
 			continue;
 
-		QAngle angRecordAngle = M::CalcAngle(pLocal->GetEyePosition(), record.vecHitboxPos).Clamped();
-		float flRecordAngleDelta = (angRecordAngle - I::Engine->GetViewAngles()).Clamped().Length();
+		QAngle angRecordAngle = M::CalcAngle(m_vecLocalEyePos, record.vecHitboxPos).Clamped();
+		float flRecordAngleDelta = (angRecordAngle - m_angLocalViewAngles).Clamped().Length();	
 
-		if (flRecordAngleDelta < flBestDelta)
+		if (flRecordAngleDelta < flBestDelta)	
 		{
 			Target.bShouldAimAtBacktrack = true;
 			Target.Record = record;
@@ -78,7 +78,7 @@ bool CLegitBot::GetTargetData(CBaseEntity* pLocal, Target_t& Target)
 CBaseEntity* CLegitBot::GetBestEntity(CBaseEntity* pLocal)
 {
 	CBaseEntity* pBestEntity = nullptr;
-	float flBestDelta = C_GET_LEGITVAR(flAimFov);
+	float flBestDelta = m_WeaponVars.flAimFov;
 
 	for (int i = 1; i <= I::Globals->nMaxClients; i++)
 	{
@@ -107,7 +107,7 @@ Vector CLegitBot::GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity)
 {
 	float iBestDelta = std::numeric_limits<float>::max();
 
-	if ((C_GET_LEGITVAR(iAimHitbox) == (int)ELegitHitboxes::CLOSEST))
+	if (m_WeaponVars.iAimHitbox == (int)ELegitHitboxes::CLOSEST)
 	{
 		Vector vecBestHitboxPos{ };
 
@@ -127,7 +127,7 @@ Vector CLegitBot::GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity)
 		return vecBestHitboxPos;
 	}
 	else
-		return pEntity->GetHitboxPosition(m_arrHitboxes.at(C_GET_LEGITVAR(iAimHitbox) - 1));
+		return pEntity->GetHitboxPosition(m_arrHitboxes.at(m_WeaponVars.iAimHitbox - 1));
 }
 
 void CLegitBot::FinalizeAngle(CBaseEntity* pLocal, QAngle& angAngle)
@@ -135,15 +135,15 @@ void CLegitBot::FinalizeAngle(CBaseEntity* pLocal, QAngle& angAngle)
 	angAngle.Normalize(); 
 	angAngle.Clamp();
 
-	if (C_GET_LEGITVAR(bAimRCS))
+	if (m_WeaponVars.bAimRCS)
 	{
 		angAngle -= pLocal->GetPunch() * m_weapon_recoil_scale->GetFloat();
 		angAngle.Clamp();
 	}
 
-	if (!C_GET_LEGITVAR(bAimSilent) && C_GET_LEGITVAR(flAimSmooth) > 1.f)
+	if (!m_WeaponVars.bAimSilent && m_WeaponVars.flAimSmooth > 1.f)
 	{
-		angAngle = m_angLocalViewAngles + (angAngle - m_angLocalViewAngles) / C_GET_LEGITVAR(flAimSmooth);
+		angAngle = m_angLocalViewAngles + (angAngle - m_angLocalViewAngles) / m_WeaponVars.flAimSmooth;
 		angAngle.Clamp();
 	}
 }
@@ -157,7 +157,7 @@ void CLegitBot::ApplyAngle(CUserCmd* pCmd, QAngle angAngle)
 	}
 
 	pCmd->angViewPoint = angAngle;
-	if (!C_GET_LEGITVAR(bAimSilent))
+	if (!m_WeaponVars.bAimSilent)
 		I::Engine->SetViewAngles(angAngle);
 
 	if (m_Target.bShouldAimAtBacktrack)
@@ -176,7 +176,7 @@ bool CLegitBot::ShouldShoot(CBaseEntity* pLocal, CUserCmd* pCmd)
 
 	short nDefinitionIndex = pBaseWeapon->GetItemDefinitionIndex();
 
-	if (IPT::IsKeyDown(C_GET_LEGITVAR(iAimKey)) || (nDefinitionIndex == WEAPON_REVOLVER && pCmd->iButtons & IN_SECOND_ATTACK)) // also aimbot with the revolver's mouse2
+	if (IPT::IsKeyDown(m_WeaponVars.iAimKey) || (nDefinitionIndex == WEAPON_REVOLVER && pCmd->iButtons & IN_SECOND_ATTACK)) // also aimbot with the revolver's mouse2
 		return true;
 	
 	return false;
@@ -241,12 +241,12 @@ bool CLegitBot::IsValid(CBaseEntity* pLocal, CBaseEntity* pEntity)
 
 	bool bIsVisible = pLocal->IsVisible(pEntity, pEntity->GetEyePosition(false));
 
-	if (!bIsVisible && !C_GET_LEGITVAR(bAimAutoWall)) // only aim at non-visible players if autowall is enabled
+	if (!bIsVisible && !m_WeaponVars.bAimAutoWall) // only aim at non-visible players if autowall is enabled
 		return false;
 
 	float flDamage = CAutoWall::Get().GetDamage(pLocal, GetBestHitbox(pLocal, pEntity));
 
-	if (!bIsVisible && flDamage < C_GET_LEGITVAR(iAimAutoWallMinDamage)) // only aim at non-visible players if damaga > mindamage
+	if (!bIsVisible && flDamage < m_WeaponVars.iAimAutoWallMinDamage) // only aim at non-visible players if damaga > mindamage
 		return false;
 
 	return true;
@@ -257,16 +257,7 @@ bool CLegitBot::ShouldRun(CBaseEntity* pLocal)
 	if (W::bMainOpened)
 		return false;
 
-	if (pLocal == nullptr)
-		return false;
-
-	if (!pLocal->IsAlive())
-		return false;
-
-	if (!C::Get<bool>(Vars.bLegit))
-		return false;
-
-	if (C_GET_LEGITVAR(iAimKey) == 0)
+	if (m_WeaponVars.iAimKey == 0)
 		return false;
 
 	return true;

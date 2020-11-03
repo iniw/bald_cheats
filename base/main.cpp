@@ -84,7 +84,7 @@ DWORD WINAPI OnDllAttach(LPVOID lpParameter)
 
 		// start tracking specified events from vector
 		// @note: all events list: https://wiki.alliedmods.net/Counter-Strike:_Global_Offensive_Events
-		U::EventListener.Setup({ XorStr("player_hurt"), XorStr("round_prestart"), XorStr("round_freeze_end") });
+		U::EventListener.Setup({ XorStr("player_hurt"), XorStr("player_death"), XorStr("round_prestart"), XorStr("round_freeze_end") });
 		L::Print(XorStr("events registered"));
 
 		// add our functionality in client functions

@@ -73,7 +73,8 @@ void CBacktracking::Run(CUserCmd* pCmd, CBaseEntity* pLocal)
 	if (iWeaponType == -1)
 		return;
 
-	if (C_GET_LEGITVAR_TYPE(iWeaponType, bAimAtBacktrack))
+	LegitbotVariables_t WeaponVars = C::Get<std::vector<LegitbotVariables_t>>(Vars.vecLegitVars)[iWeaponType];
+	if (WeaponVars.bAimAtBacktrack)
 		return;
 
 	QAngle angViewPoint;
@@ -263,9 +264,14 @@ bool CBacktracking::IsValid(CBaseEntity* pLocal, CBaseEntity* pEntity)
 Vector CBacktracking::GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix)
 {
 	float iBestDelta = std::numeric_limits<float>::max();
-	int iWeaponType = CLegitBot::Get().GetWeaponType(pLocal);
 
-	if ((C_GET_LEGITVAR_TYPE(iWeaponType, iAimHitbox) == (int)ELegitHitboxes::CLOSEST))
+	int iWeaponType = CLegitBot::Get().GetWeaponType(pLocal);
+	if (iWeaponType == -1)
+		return { };
+
+	LegitbotVariables_t WeaponVars = C::Get<std::vector<LegitbotVariables_t>>(Vars.vecLegitVars)[iWeaponType];
+
+	if (WeaponVars.iAimHitbox == (int)ELegitHitboxes::CLOSEST)
 	{
 		Vector vecBestHitboxPos = { };
 
@@ -285,7 +291,7 @@ Vector CBacktracking::GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity, s
 		return vecBestHitboxPos;
 	}
 	else
-		return pEntity->GetHitboxPosition(CLegitBot::Get().m_arrHitboxes.at((C_GET_LEGITVAR_TYPE(iWeaponType, iAimHitbox) - 1)), arrCustomMatrix);
+		return pEntity->GetHitboxPosition(CLegitBot::Get().m_arrHitboxes.at(WeaponVars.iAimHitbox - 1), arrCustomMatrix);
 }
 
 CBaseEntity* CBacktracking::GetBestEntity(CBaseEntity* pLocal)

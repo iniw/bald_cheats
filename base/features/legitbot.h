@@ -13,6 +13,8 @@
 #include "../global.h"
 // used: Record_t
 #include "lagcompensation.h"
+// used: cheat variables
+#include "../core/variables.h"
 
 /* main target structure */
 struct Target_t
@@ -73,6 +75,7 @@ private:
 
 	QAngle m_angLocalViewAngles;
 	Vector m_vecLocalEyePos;
+	LegitbotVariables_t m_WeaponVars;
+	int m_iWeaponType = 0;
 	CConVar* m_weapon_recoil_scale = I::ConVar->FindVar(XorStr("weapon_recoil_scale"));
-	int m_iWeaponType = 0; // @note i store it here to avoid calling GetWeponType a lot (look at the C_GET_LEGITVAR macro)
 };

@@ -8,6 +8,8 @@
 #include "../utilities/logging.h"
 // used: json parser implementation
 #include "../../dependencies/json/json.hpp"
+// used: arrWeaponNames
+#include "../sdk/gamedata.h"
 
 bool C::Setup(std::string_view szDefaultFileName)
 {
@@ -159,28 +161,30 @@ bool C::Save(std::string_view szFileName)
 				entry[XorStr("value")] = sub.dump();
 				break;
 			}
-			case FNV1A::HashConst("std::map<int, SkinchangerVariables_t>"):
+			case FNV1A::HashConst("std::map<""int""," "SkinchangerVariables_t"">"):
 			{
 				auto mapVariables = variable.Get<std::map<int, SkinchangerVariables_t>>();
-
+				
 				// store vector values as sub-node
 				nlohmann::json sub;
 
-				for (auto& weapon : mapVariables)
+				for (std::size_t i = 0U; i < mapVariables.size(); i++)
 				{
-					sub.push_back(weapon.first);
-					sub.push_back(weapon.second.bEnabled);
-					sub.push_back(weapon.second.iPaintKit);
-					sub.push_back(weapon.second.iPaintKitIndex);
-					sub.push_back(weapon.second.iSeed);
-					sub.push_back(weapon.second.bStatTrak);
-					sub.push_back(weapon.second.iStatTrak);
-					sub.push_back(weapon.second.iQuality);
-					sub.push_back(weapon.second.bNameTag);
-					sub.push_back(weapon.second.szNameTag);
-					sub.push_back(weapon.second.flWear);
-					sub.push_back(weapon.second.iDefinitionIndex);
-					sub.push_back(weapon.second.iDefinitionIndexOverride);
+					int iIndex = arrWeaponNames[i].first;
+
+					sub.push_back(iIndex);
+					sub.push_back(mapVariables[iIndex].bEnabled);
+					sub.push_back(mapVariables[iIndex].iPaintKit);
+					sub.push_back(mapVariables[iIndex].iPaintKitIndex);
+					sub.push_back(mapVariables[iIndex].iSeed);
+					sub.push_back(mapVariables[iIndex].bStatTrak);
+					sub.push_back(mapVariables[iIndex].iStatTrak);
+					sub.push_back(mapVariables[iIndex].iQuality);
+					sub.push_back(mapVariables[iIndex].bNameTag);
+					sub.push_back(mapVariables[iIndex].szNameTag);
+					sub.push_back(mapVariables[iIndex].flWear);
+					sub.push_back(mapVariables[iIndex].iDefinitionIndex);
+					sub.push_back(mapVariables[iIndex].iDefinitionIndexOverride);
 				}
 
 				entry[XorStr("value")] = sub.dump();
@@ -363,6 +367,37 @@ bool C::Load(std::string_view szFileName)
 						vecVars.at(i).iAimAutoWallMinDamage = vector.at(i * 9 + 8).get<int>();
 					}
 				}
+
+				break;
+			}
+			case FNV1A::HashConst("std::map<""int""," "SkinchangerVariables_t"">"):
+			{
+				auto map = nlohmann::json::parse(variable[XorStr("value")].get<std::string>());
+				auto& mapVars = entry.Get<std::map<int, SkinchangerVariables_t>>();
+
+				// fill node with all vector values
+				for (std::size_t i = 0U; i < map.size(); i++)
+				{
+					if (i < mapVars.size())
+					{
+						int iIndex = arrWeaponNames[i].first;
+																 // i * size of struct + 1 (skip definition index)
+						mapVars.at(iIndex).bEnabled					= map.at(i * 13 + 1).get<bool>();
+						mapVars.at(iIndex).iPaintKit				= map.at(i * 13 + 2).get<int>();
+						mapVars.at(iIndex).iPaintKitIndex			= map.at(i * 13 + 3).get<int>();
+						mapVars.at(iIndex).iSeed					= map.at(i * 13 + 4).get<int>();
+						mapVars.at(iIndex).bStatTrak				= map.at(i * 13 + 5).get<bool>();
+						mapVars.at(iIndex).iStatTrak				= map.at(i * 13 + 6).get<int>();
+						mapVars.at(iIndex).iQuality					= map.at(i * 13 + 7).get<int>();
+						mapVars.at(iIndex).bNameTag					= map.at(i * 13 + 8).get<bool>();
+						mapVars.at(iIndex).szNameTag				= map.at(i * 13 + 9).get<std::string>();
+						mapVars.at(iIndex).flWear					= map.at(i * 13 + 10).get<float>();
+						mapVars.at(iIndex).iDefinitionIndex			= map.at(i * 13 + 11).get<int>();
+						mapVars.at(iIndex).iDefinitionIndexOverride = map.at(i * 13 + 12).get<int>();
+					}
+				}
+
+				break;
 			}
 			default:
 				break;

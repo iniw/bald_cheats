@@ -21,7 +21,6 @@
 
 /* features */
 #include "../features/prediction.h"
-#include "../features/ragebot.h"
 #include "../features/legitbot.h"
 #include "../features/lagcompensation.h"
 #include "../features/triggerbot.h"
@@ -283,7 +282,7 @@ bool FASTCALL H::hkCreateMove(IClientModeShared* thisptr, int edx, float flInput
 		if (C::Get<bool>(Vars.bMiscAutoPistol))
 			CMiscellaneous::Get().AutoPistol(pCmd, pLocal);
 
-		if (C::Get<bool>(Vars.bLegit))
+		if (C::Get<bool>(Vars.bLegit) && pLocal != nullptr && pLocal->IsAlive())
 			CLegitBot::Get().Run(pCmd, pLocal, bSendPacket);
 
 		if (C::Get<bool>(Vars.bTrigger))
@@ -325,8 +324,6 @@ bool FASTCALL H::hkCreateMove(IClientModeShared* thisptr, int edx, float flInput
 
 	// save next global sendpacket state
 	G::bSendPacket = bSendPacket;
-	
-	// @note: i seen many times this mistake and please do not set/clamp angles here cuz u get confused with psilent aimbot later!
 
 	return false;
 }
@@ -384,7 +381,7 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 	if (!I::Engine->IsInGame())
 	{
 		CLagCompensation::Get().ClearIncomingSequences(); // clear sequences or we get commands overflow on new map connection
-		CVisuals::Get().vecHitMarks.clear(); // clear hitmarker info
+		CVisuals::Get().m_deqHitMarkers.clear(); // clear hitmarker info
 		return oFrameStageNotify(thisptr, edx, stage);
 	}
 

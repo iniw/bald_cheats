@@ -12,24 +12,22 @@
 #include "../utilities/math.h"
 // used: input system
 #include "../utilities/inputsystem.h"
+#include "../utilities/logging.h"
+#include "visuals.h"
 
 void CMiscellaneous::Run(CUserCmd* pCmd, CBaseEntity* pLocal, bool& bSendPacket)
 {
 	if (!pLocal->IsAlive())
 		return;
 
-	// @credits: a8pure c:
 	if (C::Get<bool>(Vars.bMiscNoCrouchCooldown))
 		pCmd->iButtons |= IN_BULLRUSH;
 
 	if (C::Get<bool>(Vars.bMiscBunnyHop))
 		BunnyHop(pCmd, pLocal);
 
-	if (C::Get<bool>(Vars.bMiscAutoStrafe))
-		AutoStrafe(pCmd, pLocal);
-
 	if (C::Get<int>(Vars.iMiscBlockBotKey) && IPT::IsKeyDown(C::Get<int>(Vars.iMiscBlockBotKey)))
-		BlockBot(pCmd, pLocal);
+		CMiscellaneous::Get().BlockBot(pCmd, pLocal);
 
 	if (C::Get<bool>(Vars.bMiscRevealRanks) && pCmd->iButtons & IN_SCORE)
 		I::Client->DispatchUserMessage(CS_UM_ServerRankRevealAll, 0U, 0, nullptr);
@@ -37,9 +35,20 @@ void CMiscellaneous::Run(CUserCmd* pCmd, CBaseEntity* pLocal, bool& bSendPacket)
 
 void CMiscellaneous::PostPrediction(CUserCmd* pCmd, int iPreFlags, int iPostFlags)
 {
-	JumpBug(pCmd, iPreFlags, iPostFlags);
-	EdgeJump(pCmd, iPreFlags, iPostFlags);
-	EdgeBug(pCmd, iPreFlags, iPostFlags);
+	if (C::Get<int>(Vars.iMiscJumpBugKey) && IPT::IsKeyDown(C::Get<int>(Vars.iMiscJumpBugKey)))
+		JumpBug(pCmd, iPreFlags, iPostFlags);
+
+	if (C::Get<int>(Vars.iMiscEdgeBugKey) && IPT::IsKeyDown(C::Get<int>(Vars.iMiscEdgeBugKey)))
+		EdgeBug(pCmd, iPreFlags, iPostFlags);
+
+	if (C::Get<int>(Vars.iMiscEdgeJumpKey) && IPT::IsKeyDown(C::Get<int>(Vars.iMiscEdgeJumpKey)))
+	{
+		EdgeJump(pCmd, iPreFlags, iPostFlags);
+
+		if (C::Get<bool>(Vars.bMiscEdgeJumpLong))
+			EdgeJumpLongJump(pCmd, iPreFlags, iPostFlags);
+	}
+		
 }
 
 void CMiscellaneous::Event(IGameEvent* pEvent, const FNV1A_t uNameHash)
@@ -51,17 +60,14 @@ void CMiscellaneous::Event(IGameEvent* pEvent, const FNV1A_t uNameHash)
 void CMiscellaneous::MovementCorrection(CUserCmd* pCmd, CBaseEntity* pLocal, QAngle& angOldViewPoint)
 {
 	static CConVar* cl_forwardspeed = I::ConVar->FindVar(XorStr("cl_forwardspeed"));
-
 	if (cl_forwardspeed == nullptr)
 		return;
 
 	static CConVar* cl_sidespeed = I::ConVar->FindVar(XorStr("cl_sidespeed"));
-
 	if (cl_sidespeed == nullptr)
 		return;
 
 	static CConVar* cl_upspeed = I::ConVar->FindVar(XorStr("cl_upspeed"));
-
 	if (cl_upspeed == nullptr)
 		return;
 
@@ -151,9 +157,9 @@ void CMiscellaneous::AutoQueue()
 	if (auto match_session = I::MatchFramework->GetMatchSession()) {
 		if (!search_started()) {
 			auto session_settings = match_session->GetSessionSettings();
-			session_settings->SetString("game/type", "classic");
-			session_settings->SetString("game/mode", "casual");
-			session_settings->SetString("game/mapgroupname", "mg_de_dust2");
+			session_settings->KeySetString("game/type", "classic");
+			session_settings->KeySetString("game/mode", "casual");
+			session_settings->KeySetString("game/mapgroupname", "mg_de_dust2");
 			match_session->UpdateSessionSettings(session_settings);
 			handle_match_start(*(uint8_t**)singleton, "", "", "", "");
 		}
@@ -205,60 +211,63 @@ void CMiscellaneous::BunnyHop(CUserCmd* pCmd, CBaseEntity* pLocal)
 
 void CMiscellaneous::BlockBot(CUserCmd* pCmd, CBaseEntity* pLocal)
 {
-	float flBestDistance = 250.f;
-	CBaseEntity* pBestEntity = nullptr;
+	if (pCmd->flSideMove != 0 || pCmd->flForwardMove != 0)
+		return;
 
-	for (int i = 1; i < I::Globals->nMaxClients; i++)
+	// entity we are going to blockbot
+	CBaseEntity* pTarget = nullptr;
+
+	// maximum speed we can move sideways (usually 450)
+	static CConVar* cl_sidespeed = I::ConVar->FindVar("cl_sidespeed");
+	if (cl_sidespeed == nullptr)
+		return;
+
+	// maximum speed we can move foward (usually 450)
+	static CConVar* cl_forwardspeed = I::ConVar->FindVar("cl_forwardspeed");
+	if (cl_forwardspeed == nullptr)
+		return;
+
+	// maximum distance the target can be in order to be blockbotted
+	float flMaxDistance = 250.f;
+
+	if (pTarget == nullptr) // don't choose an entity while we are already blockbotting
 	{
-		if (i == I::Engine->GetLocalPlayer())
-			continue;
-
-		CBaseEntity* pEntity = I::ClientEntityList->Get<CBaseEntity>(i);
-
-		if (pEntity == nullptr || !pEntity->IsAlive() || pEntity->IsDormant())
-			continue;
-
-		float flDistance = pLocal->GetOrigin().DistTo(pEntity->GetOrigin());
-
-		if (flDistance < flBestDistance)
+		for (int i = 1; i < I::Globals->nMaxClients; i++)
 		{
-			flBestDistance = flDistance;
-			pBestEntity = pEntity;
+			if (i == I::Engine->GetLocalPlayer())
+				continue;
+
+			CBaseEntity* pEntity = I::ClientEntityList->Get<CBaseEntity>(i);
+
+			if (pEntity == nullptr || !pEntity->IsAlive() || pEntity->IsDormant() || pEntity->HasImmunity())
+				continue;
+
+			float flDistance = pLocal->GetAbsOrigin().DistTo(pEntity->GetAbsOrigin());
+
+			if (flDistance < flMaxDistance)
+			{
+				flMaxDistance = flDistance;
+				pTarget = pEntity;
+			}
 		}
 	}
 
-	if (pBestEntity == nullptr)
+	if (pTarget == nullptr)
 		return;
 
-	QAngle angAngle = M::CalcAngle(pLocal->GetOrigin(), pBestEntity->GetOrigin());
+	QAngle angAngle = M::CalcAngle(pLocal->GetAbsOrigin(), pTarget->GetAbsOrigin());
 
-	angAngle.y -= pLocal->GetEyeAngles().y;
+	angAngle.y -= pCmd->angViewPoint.y;
 	angAngle.Normalize();
-	//angAngle.Clamp();
 
-	if (angAngle.y < 0.0f)
-		pCmd->flSideMove = 450.f;
-	else if (angAngle.y > 0.0f)
-		pCmd->flSideMove = -450.f;
-}
+	pCmd->flSideMove = angAngle.y > 0.1f ? -cl_sidespeed->GetFloat() : cl_sidespeed->GetFloat();
 
-void CMiscellaneous::AutoStrafe(CUserCmd* pCmd, CBaseEntity* pLocal)
-{
-	if (pLocal->GetMoveType() == MOVETYPE_LADDER || pLocal->GetMoveType() == MOVETYPE_NOCLIP)
-		return;
-
-	if (pLocal->GetFlags() & FL_ONGROUND)
-		return;
-
-	pCmd->flSideMove = pCmd->sMouseDeltaX < 0.f ? -450.f : 450.f;
+	MovementCorrection(pCmd, pLocal, QAngle(0, -90, 0));
 }
 
 void CMiscellaneous::JumpBug(CUserCmd* pCmd, int iPreFlags, int iPostFlags)
 {
-	if (!IPT::IsKeyDown(C::Get<int>(Vars.iMiscJumpBugKey)))
-		return;
-
-	if (!(iPreFlags & FL_ONGROUND) && (iPostFlags & FL_ONGROUND))
+	if (!(iPreFlags & FL_ONGROUND) && (iPostFlags & FL_ONGROUND)) // if we are going to be on ground the next tick and aren't currently on ground
 	{
 		pCmd->iButtons |= IN_DUCK;
 		pCmd->iButtons &= ~IN_JUMP;
@@ -267,18 +276,40 @@ void CMiscellaneous::JumpBug(CUserCmd* pCmd, int iPreFlags, int iPostFlags)
 
 void CMiscellaneous::EdgeJump(CUserCmd* pCmd, int iPreFlags, int iPostFlags)
 {
-	if (!IPT::IsKeyDown(C::Get<int>(Vars.iMiscEdgeJumpKey)))
-		return;
-
-	if ((iPreFlags & FL_ONGROUND) && !(iPostFlags & FL_ONGROUND))
+	if ((iPreFlags & FL_ONGROUND) && !(iPostFlags & FL_ONGROUND)) // if we are going to be on air the next tick and aren't currently on air
 		pCmd->iButtons |= IN_JUMP;
 }
 
 void CMiscellaneous::EdgeBug(CUserCmd* pCmd, int iPreFlags, int iPostFlags)
 {
-	if (!IPT::IsKeyDown(C::Get<int>(Vars.iMiscEdgeBugKey)))
-		return;
-
-	if (!(iPreFlags & FL_ONGROUND) && (iPostFlags & FL_ONGROUND))
+	if (!(iPreFlags & FL_ONGROUND) && iPostFlags & FL_ONGROUND) // if we are going to be on ground the next tick and aren't currently on ground
 		pCmd->iButtons |= IN_DUCK;
+}
+
+void CMiscellaneous::EdgeJumpLongJump(CUserCmd* pCmd, int iPreFlags, int iPostFlags)
+{
+	static bool bTimerStart = false;
+	static int iTimer = 0;
+
+	if (iPreFlags & FL_ONGROUND && !(iPostFlags & FL_ONGROUND))
+		pCmd->iButtons |= IN_JUMP;
+
+	if (pCmd->iButtons & IN_JUMP)
+	{
+		pCmd->iButtons |= IN_DUCK;
+
+		if (!bTimerStart)
+		{
+			iTimer = I::Globals->iTickCount;
+			bTimerStart = true;
+		}
+	}
+
+	if (iTimer + 2 > I::Globals->iTickCount && bTimerStart)
+		pCmd->iButtons |= IN_DUCK;
+	else if (iTimer + 2 < I::Globals->iTickCount && bTimerStart)
+		bTimerStart = false;
+
+	if (pCmd->iButtons & IN_DUCK && !(pCmd->iButtons & IN_JUMP) && iPreFlags & FL_ONGROUND)
+		pCmd->iButtons &= ~IN_DUCK; // poo fix, could also be ljtimer
 }

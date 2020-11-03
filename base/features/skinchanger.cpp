@@ -187,6 +187,33 @@ void CSkinChanger::Event(IGameEvent* pEvent, const FNV1A_t uNameHash)
 {
 	if (!I::Engine->IsInGame())
 		return;
+
+	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
+	if (pLocal == nullptr || !pLocal->IsAlive())
+		return;
+
+	int nDefinitionIndex = -1;
+
+	for (auto& item : mapItemList)
+	{
+		if (std::strcmp(item.second.szKillIcon, pEvent->GetString("weapon")) == 0)
+		{
+			nDefinitionIndex = item.first;
+
+			if (IsKnife(nDefinitionIndex))
+				nDefinitionIndex = WEAPON_KNIFE;
+
+			break;
+		}
+	}
+
+	if (nDefinitionIndex == -1 || !IsKnife(nDefinitionIndex)) // if the weapon used to kill is not inside the map or if it isn't a knife, return
+		return;
+
+	SkinchangerVariables_t WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[nDefinitionIndex];
+
+	if (WeaponVars.iDefinitionIndexOverride && I::Engine->GetPlayerForUserID(pEvent->GetInt(XorStr("attacker"))) == I::Engine->GetLocalPlayer())
+		pEvent->SetString("weapon", mapItemList[WeaponVars.iDefinitionIndexOverride].szKillIcon);
 }
 
 void CSkinChanger::Dump()
@@ -224,7 +251,7 @@ void CSkinChanger::Dump()
 			if (pPaintKit->id < 10000)
 				vecSkinKits.push_back({ pPaintKit->id, pPaintKit->id != 0 ? fmt::format("{} - {:d}", szName, pPaintKit->id) : szName });
 			else
-				vecGloveKits.push_back({ pPaintKit->id, szName });
+				vecGloveKits.push_back({ pPaintKit->id, pPaintKit->id != 0 ? fmt::format("{} - {:d}", szName, pPaintKit->id) : szName });
 		}
 
 		std::sort(vecSkinKits.begin(), vecSkinKits.end());

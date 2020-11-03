@@ -4,8 +4,8 @@
 #include "../core/interfaces.h"
 
 /* features event */
-#include "../features/resolver.h"
 #include "../features/visuals.h"
+#include "../features/skinchanger.h"
 #include "../features/misc.h"
 
 void CEventListener::Setup(const std::deque<const char*> arrEvents)
@@ -18,7 +18,7 @@ void CEventListener::Setup(const std::deque<const char*> arrEvents)
 		I::GameEvent->AddListener(this, szEvent, false);
 
 		if (!I::GameEvent->FindListener(this, szEvent))
-			throw std::runtime_error(XorStr("failed add listener"));
+			throw std::runtime_error(XorStr("failed to add event listener"));
 	}
 }
 
@@ -36,6 +36,20 @@ void CEventListener::FireGameEvent(IGameEvent* pEvent)
 	const FNV1A_t uNameHash = FNV1A::Hash(pEvent->GetName());
 
 	#pragma region eventlistener_handlers
-	CVisuals::Get().Event(pEvent, uNameHash);
+	switch (uNameHash)
+	{
+	case FNV1A::HashConst("player_death"):
+	{
+		CSkinChanger::Get().Event(pEvent, uNameHash);
+		break;
+	}
+	case FNV1A::HashConst("player_hurt"):
+	{
+		CVisuals::Get().Event(pEvent, uNameHash);
+		break;
+	}
+	default:
+		break;
+	}
 	#pragma endregion
 }

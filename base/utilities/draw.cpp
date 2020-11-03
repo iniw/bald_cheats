@@ -723,11 +723,6 @@ void D::AddText(const ImFont* pFont, float flFontSize, const ImVec2& vecPosition
 	draw.colSecond = colOutline.GetU32();
 	vecDrawData.emplace_back(draw);
 }
-
-void D::AddText(const ImVec2& vecPosition, const std::string& szText, Color colText, int iFlags, Color colOutline)
-{
-	AddText(nullptr, 0.f, vecPosition, szText, colText, iFlags, colOutline);
-}
 #pragma endregion
 
 #pragma region draw_extra

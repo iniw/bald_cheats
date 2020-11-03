@@ -43,4 +43,9 @@ private:
 	void Weapons(CBaseEntity* pLocal);
 	void Gloves(CBaseEntity* pLocal);
 	void Apply(CBaseCombatWeapon* pWeapon, SkinchangerVariables_t WeaponVars, unsigned int iXuidLow);
+	/* returns true if the definition index is of a knife */
+	bool IsKnife(short nDefinitionIndex)
+	{
+		return (nDefinitionIndex >= WEAPON_KNIFE_BAYONET && nDefinitionIndex <= WEAPON_KNIFE_SKELETON) || nDefinitionIndex == WEAPON_KNIFE_T || nDefinitionIndex == WEAPON_KNIFE;
+	}
 };

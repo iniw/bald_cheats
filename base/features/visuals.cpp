@@ -283,14 +283,13 @@ void CVisuals::Event(IGameEvent* pEvent, const FNV1A_t uNameHash)
 		return;
 
 	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
-
 	if (pLocal == nullptr || !pLocal->IsAlive())
 		return;
 
 	float flServerTime = TICKS_TO_TIME(pLocal->GetTickBase());
 
 	/* get hitmarker info */
-	if (C::Get<bool>(Vars.bScreenHitMarker) && uNameHash == FNV1A::HashConst("player_hurt"))
+	if (C::Get<bool>(Vars.bScreenHitMarker))
 	{
 		CBaseEntity* pAttacker = I::ClientEntityList->Get<CBaseEntity>(I::Engine->GetPlayerForUserID(pEvent->GetInt(XorStr("attacker"))));
 
@@ -312,7 +311,7 @@ void CVisuals::Event(IGameEvent* pEvent, const FNV1A_t uNameHash)
 					return;
 
 				// add hit info
-				vecHitMarks.emplace_back(HitMarkerObject_t{ vecPosition.value(), pEvent->GetInt(XorStr("dmg_health")), flServerTime + C::Get<float>(Vars.flScreenHitMarkerTime) });
+				m_deqHitMarkers.emplace_back(HitMarkerObject_t{ vecPosition.value(), pEvent->GetInt(XorStr("dmg_health")), flServerTime + C::Get<float>(Vars.flScreenHitMarkerTime) });
 			}
 		}
 	}
@@ -350,13 +349,13 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 		switch (C::Get<int>(Vars.iEspChamsEnemiesVisible))
 		{
 		case (int)EVisualsEnemiesChams::FLAT:
-			pMaterial = arrMaterials.at(0).second;
+			pMaterial = m_arrMaterials.at(0).second;
 			break;
 		case (int)EVisualsEnemiesChams::REFLECTIVE:
-			pMaterial = arrMaterials.at(2).first;
+			pMaterial = m_arrMaterials.at(2).first;
 			break;
 		default:
-			pMaterial = arrMaterials.at(0).first;
+			pMaterial = m_arrMaterials.at(0).first;
 			break;
 		}
 
@@ -364,26 +363,26 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 		switch (C::Get<int>(Vars.iEspChamsEnemiesWall))
 		{
 		case (int)EVisualsEnemiesChams::FLAT:
-			pMaterialWall = arrMaterials.at(0).second;
+			pMaterialWall = m_arrMaterials.at(0).second;
 			break;
 		case (int)EVisualsEnemiesChams::REFLECTIVE:
-			pMaterialWall = arrMaterials.at(2).first;
+			pMaterialWall = m_arrMaterials.at(2).first;
 			break;
 		default:
-			pMaterialWall = arrMaterials.at(0).first;
+			pMaterialWall = m_arrMaterials.at(0).first;
 			break;
 		}
 
 		switch (C::Get<int>(Vars.iEspChamsEnemiesBacktrack))
 		{
 		case (int)EVisualsEnemiesChams::FLAT:
-			pMaterialBacktrack = arrMaterials.at(0).second;
+			pMaterialBacktrack = m_arrMaterials.at(0).second;
 			break;
 		case (int)EVisualsEnemiesChams::REFLECTIVE:
-			pMaterialBacktrack = arrMaterials.at(2).first;
+			pMaterialBacktrack = m_arrMaterials.at(2).first;
 			break;
 		default:
-			pMaterialBacktrack = arrMaterials.at(0).first;
+			pMaterialBacktrack = m_arrMaterials.at(0).first;
 			break;
 		}
 
@@ -569,19 +568,19 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 		switch (C::Get<int>(Vars.iEspChamsViewModel))
 		{
 			case (int)EVisualsViewModelChams::FLAT:
-				pMaterial = arrMaterials.at(1).second;
+				pMaterial = m_arrMaterials.at(1).second;
 				break;
 			case (int)EVisualsViewModelChams::GLOW:
-				pMaterial = arrMaterials.at(2).second;
+				pMaterial = m_arrMaterials.at(2).second;
 				break;
 			case (int)EVisualsViewModelChams::SCROLL:
-				pMaterial = arrMaterials.at(3).first;
+				pMaterial = m_arrMaterials.at(3).first;
 				break;
 			case (int)EVisualsViewModelChams::CHROME:
-				pMaterial = arrMaterials.at(3).second;
+				pMaterial = m_arrMaterials.at(3).second;
 				break;
 			default:
-				pMaterial = arrMaterials.at(1).first;
+				pMaterial = m_arrMaterials.at(1).first;
 				break;
 		}
 
@@ -878,11 +877,11 @@ IMaterial* CVisuals::CreateMaterial(std::string_view szName, std::string_view sz
 
 void CVisuals::HitMarker(const ImVec2& vecScreenSize, float flServerTime, Color colLines, Color colDamage)
 {
-	if (vecHitMarks.empty())
+	if (m_deqHitMarkers.empty())
 		return;
 
 	// get last time delta for lines
-	const float flLastDelta = vecHitMarks.back().flTime - flServerTime;
+	const float flLastDelta = m_deqHitMarkers.back().flTime - flServerTime;
 
 	if (flLastDelta <= 0.f)
 		return;
@@ -901,18 +900,18 @@ void CVisuals::HitMarker(const ImVec2& vecScreenSize, float flServerTime, Color 
 		return;
 
 	const float flMaxDamageAlpha = colDamage.aBase();
-	for (std::size_t i = 0U; i < vecHitMarks.size(); i++)
+	for (std::size_t i = 0U; i < m_deqHitMarkers.size(); i++)
 	{
-		const float flDelta = vecHitMarks.at(i).flTime - flServerTime;
+		const float flDelta = m_deqHitMarkers.at(i).flTime - flServerTime;
 
 		if (flDelta <= 0.f)
 		{
-			vecHitMarks.erase(vecHitMarks.cbegin() + i);
+			m_deqHitMarkers.erase(m_deqHitMarkers.cbegin() + i);
 			continue;
 		}
 
 		Vector2D vecScreen = { };
-		if (D::WorldToScreen(vecHitMarks.at(i).vecPosition, vecScreen))
+		if (D::WorldToScreen(m_deqHitMarkers.at(i).vecPosition, vecScreen))
 		{
 			// max distance for floating damage
 			constexpr float flDistance = 40.f;
@@ -923,7 +922,7 @@ void CVisuals::HitMarker(const ImVec2& vecScreenSize, float flServerTime, Color 
 			colDamage.arrColor.at(3) = static_cast<std::uint8_t>(iAlpha);
 
 			// draw dealt damage
-			D::AddText(F::SmallestPixel, 15.f, ImVec2(vecScreen.x, vecScreen.y - flRatio * flDistance), std::to_string(vecHitMarks.at(i).iDamage), colDamage, IMGUI_TEXT_OUTLINE, Color(0, 0, 0, iAlpha));
+			D::AddText(F::SmallestPixel, 15.f, ImVec2(vecScreen.x, vecScreen.y - flRatio * flDistance), std::to_string(m_deqHitMarkers.at(i).iDamage), colDamage, IMGUI_TEXT_OUTLINE, Color(0, 0, 0, iAlpha));
 		}
 	}
 }

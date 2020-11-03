@@ -45,8 +45,6 @@
     <ClInclude Include="features\legitbot.h" />
     <ClInclude Include="features\misc.h" />
     <ClInclude Include="features\prediction.h" />
-    <ClInclude Include="features\ragebot.h" />
-    <ClInclude Include="features\resolver.h" />
     <ClInclude Include="features\skinchanger.h" />
     <ClInclude Include="features\triggerbot.h" />
     <ClInclude Include="features\visuals.h" />
@@ -150,8 +148,6 @@
     <ClCompile Include="features\autowall.cpp" />
     <ClCompile Include="features\lagcompensation.cpp" />
     <ClCompile Include="features\legitbot.cpp" />
-    <ClCompile Include="features\ragebot.cpp" />
-    <ClCompile Include="features\resolver.cpp" />
     <ClCompile Include="features\skinchanger.cpp" />
     <ClCompile Include="features\triggerbot.cpp" />
     <ClCompile Include="features\visuals.cpp" />

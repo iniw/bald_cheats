@@ -96,7 +96,7 @@ public:
 		return oFindKey(this, szKeyName, bCreate);
 	}
 
-	void SetString(const char* szKeyName, const char* szValue)
+	void KeySetString(const char* szKeyName, const char* szValue)
 	{
 		CKeyValues* pKey = FindKey(szKeyName, true);
 

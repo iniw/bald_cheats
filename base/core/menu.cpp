@@ -147,33 +147,38 @@ void T::LegitBot()
 	{
 		ImGui::BeginChild(XorStr("legitbot.aimbot"), ImVec2(0, 215), true, ImGuiWindowFlags_MenuBar);
 		{
-		
-		if (ImGui::BeginMenuBar())
-		{
-			ImGui::TextUnformatted(XorStr("aim  assistance"));
-			ImGui::EndMenuBar();
-		}
+			if (ImGui::BeginMenuBar())
+			{
+				ImGui::TextUnformatted(XorStr("aim  assistance"));
+				ImGui::EndMenuBar();
+			}
 
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1));
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1));
 
-		int iWeaponType = C::Get<int>(Vars.iLegitWeapon);
-		ImGui::Checkbox(XorStr("master switch"), &C::Get<bool>(Vars.bLegit));
-		ImGui::Combo(XorStr("weapon config"), &C::Get<int>(Vars.iLegitWeapon), XorStr("rifles\0snipers\0pistols\0heavy pistols\0smgs\0other\0\0"));
-		ImGui::Combo(XorStr("hitbox selection"), &C_GET_LEGITVAR_TYPE(iWeaponType, iAimHitbox), XorStr("closest\0head\0chest\0stomach\0\0"));
-		ImGui::SliderFloat(XorStr("maximum fov##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, flAimFov), 0, 20, u8"%.1f\u00B0");
-		if (!C_GET_LEGITVAR_TYPE(iWeaponType, bAimSilent))
-			ImGui::SliderFloat(XorStr("smoothing amount##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, flAimSmooth), 1, 10, "%.1f");
-		ImGui::HotKey(XorStr("aim key##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, iAimKey));
-		ImGui::Checkbox(XorStr("aim at backtrack"), &C_GET_LEGITVAR_TYPE(iWeaponType, bAimAtBacktrack));
-		ImGui::Checkbox(XorStr("silent aim##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, bAimSilent));
-		if (iWeaponType != (int)ELegitWeaponTypes::SNIPERS) // no rcs for snipers
-			ImGui::Checkbox(XorStr("recoil control##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, bAimRCS));
-		ImGui::Checkbox(XorStr("penetrate walls##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, bAimAutoWall));
-		if (C_GET_LEGITVAR_TYPE(iWeaponType, bAimAutoWall))
-			ImGui::SliderInt(XorStr("minimum damage##legitbot"), &C_GET_LEGITVAR_TYPE(iWeaponType, iAimAutoWallMinDamage), 0, 100, "%dhp");
+			LegitbotVariables_t& WeaponVars = C::Get<std::vector<LegitbotVariables_t>>(Vars.vecLegitVars)[C::Get<int>(Vars.iLegitWeapon)];
 
-		ImGui::PopStyleVar();
-		ImGui::EndChild();
+			ImGui::Checkbox(XorStr("master switch"), &C::Get<bool>(Vars.bLegit));
+			ImGui::Combo(XorStr("weapon config"), &C::Get<int>(Vars.iLegitWeapon), XorStr("rifles\0snipers\0pistols\0heavy pistols\0smgs\0other\0\0"));
+			ImGui::Combo(XorStr("hitbox selection"), &WeaponVars.iAimHitbox, XorStr("closest\0head\0chest\0stomach\0\0"));
+			ImGui::SliderFloat(XorStr("maximum fov##legitbot"), &WeaponVars.flAimFov, 0, 20, u8"%.1f\u00B0");
+
+			if (!WeaponVars.bAimSilent)
+				ImGui::SliderFloat(XorStr("smoothing amount##legitbot"), &WeaponVars.flAimSmooth, 1, 10, "%.1f");
+
+			ImGui::HotKey(XorStr("aim key##legitbot"), &WeaponVars.iAimKey);
+			ImGui::Checkbox(XorStr("aim at backtrack"), &WeaponVars.bAimAtBacktrack);
+			ImGui::Checkbox(XorStr("silent aim##legitbot"), &WeaponVars.bAimSilent);
+
+			if (C::Get<int>(Vars.iLegitWeapon) != (int)ELegitWeaponTypes::SNIPERS) // no rcs for snipers
+				ImGui::Checkbox(XorStr("recoil control##legitbot"), &WeaponVars.bAimRCS);
+
+			ImGui::Checkbox(XorStr("penetrate walls##legitbot"), &WeaponVars.bAimAutoWall);
+
+			if (WeaponVars.bAimAutoWall)
+				ImGui::SliderInt(XorStr("minimum damage##legitbot"), &WeaponVars.iAimAutoWallMinDamage, 0, 100, "%dhp");
+
+			ImGui::PopStyleVar();
+			ImGui::EndChild();
 		}
 	}
 	ImGui::BeginChild(XorStr("legitbot.backtrack"), ImVec2(), true, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
@@ -541,6 +546,8 @@ void T::Miscellaneous()
 			ImGui::HotKey(XorStr("jumpbug"), &C::Get<int>(Vars.iMiscJumpBugKey));
 			ImGui::HotKey(XorStr("edgebug"), &C::Get<int>(Vars.iMiscEdgeBugKey));
 			ImGui::HotKey(XorStr("edgejump"), &C::Get<int>(Vars.iMiscEdgeJumpKey));
+			if (C::Get<int>(Vars.iMiscEdgeJumpKey) > 0)
+				ImGui::Checkbox(XorStr("lj on edgejump"), &C::Get<bool>(Vars.bMiscEdgeJumpLong));
 			ImGui::Checkbox(XorStr("no crouch cooldown"), &C::Get<bool>(Vars.bMiscNoCrouchCooldown));
 			ImGui::Checkbox(XorStr("velocity indicator"), &C::Get<bool>(Vars.bMiscVeloIndicator));
 			ImGui::PopStyleVar();
@@ -695,7 +702,7 @@ void T::SkinChanger()
 				{
 					*out_text = arrWeaponNames[idx].second;
 					return true;
-				}, nullptr, 35, 8); int iIndex = arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first;
+				}, nullptr, 36, 8); int iIndex = arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first;
 
 			SkinchangerVariables_t& WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[iIndex];
 			WeaponVars.iDefinitionIndex = iIndex;
@@ -708,7 +715,7 @@ void T::SkinChanger()
 					{
 						*out_text = arrKnifeNames[idx].second;
 						return true;
-					}, nullptr, 19, 8); WeaponVars.iDefinitionIndexOverride = arrKnifeNames[C::Get<int>(Vars.iSkinchangerKnife)].first;
+					}, nullptr, 20, 8); WeaponVars.iDefinitionIndexOverride = arrKnifeNames[C::Get<int>(Vars.iSkinchangerKnife)].first;
 			}
 			else if (iIndex == GLOVE_T)
 			{

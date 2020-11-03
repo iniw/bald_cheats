@@ -49,7 +49,7 @@ public:
 		 *	2 - reflects	[+/+] [-/-]
 		 *	3 - custom		[+/+] [+/-]
 		 */
-		arrMaterials =
+		m_arrMaterials =
 		{
 			std::make_pair(CreateMaterial(XorStr("qo0_players"), XorStr("VertexLitGeneric")),
 			CreateMaterial(XorStr("qo0_players_flat"), XorStr("UnlitGeneric"))),
@@ -65,7 +65,7 @@ public:
 		};
 
 		// increment references for every material only once
-		for (auto& [pFirstMaterial, pSecondMaterial] : arrMaterials)
+		for (auto& [pFirstMaterial, pSecondMaterial] : m_arrMaterials)
 		{
 			if (pFirstMaterial != nullptr && !pFirstMaterial->IsErrorMaterial())
 				pFirstMaterial->IncrementReferenceCount();
@@ -90,7 +90,7 @@ public:
 	void NightMode();
 
 	/* saved hitmarker info's */
-	std::deque<HitMarkerObject_t> vecHitMarks = { };
+	std::deque<HitMarkerObject_t> m_deqHitMarkers = { };
 
 private:
 	enum EPaddingDirection : unsigned int
@@ -155,5 +155,5 @@ private:
 	void Skeleton(CBaseEntity* pEntity);
 
 	/* chams materials */
-	std::array<std::pair<IMaterial*, IMaterial*>, 4U> arrMaterials = { };
+	std::array<std::pair<IMaterial*, IMaterial*>, 4U> m_arrMaterials = { };
 };
