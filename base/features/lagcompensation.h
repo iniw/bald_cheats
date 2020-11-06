@@ -109,6 +109,8 @@ private:
 	CBaseEntity* GetBestEntity(CBaseEntity* pLocal);
 	/* returns the best record for the entity at that index */
 	Record_t GetBestRecord(CBaseEntity* pLocal, int iIndex);
+	/* returns the total amount of latency */
+	float	GetLatency(bool bOutgoing, bool bIncoming);
 
 	/* member variables */
 	OriginalData_t m_orgData; // original data of the entity we're backtracking 

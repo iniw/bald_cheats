@@ -337,8 +337,8 @@ struct Variables_t
 	C_ADD_VARIABLE(bool, bMiscAutoAccept, false);
 	C_ADD_VARIABLE(bool, bMiscAutoPistol, false);
 	C_ADD_VARIABLE(int, iMiscBlockBotKey, 0);
-	C_ADD_VARIABLE(bool, bMiscPingSpike, false);
-	C_ADD_VARIABLE(int, iMiscLatencyFactor, 100);
+	C_ADD_VARIABLE(bool, bMiscFakeLatency, false);
+	C_ADD_VARIABLE(int, iMiscFakeLatencyAmount, 100);
 	C_ADD_VARIABLE(bool, bMiscRevealRanks, false);
 	C_ADD_VARIABLE(bool, bMiscUnlockInventory, false);
 	C_ADD_VARIABLE(bool, bMiscAntiUntrusted, true);

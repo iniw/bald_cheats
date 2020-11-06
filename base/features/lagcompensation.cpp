@@ -69,7 +69,6 @@ void CBacktracking::Run(CUserCmd* pCmd, CBaseEntity* pLocal)
 		return;
 
 	int iWeaponType = CLegitBot::Get().GetWeaponType(pLocal);
-
 	if (iWeaponType == -1)
 		return;
 
@@ -77,8 +76,7 @@ void CBacktracking::Run(CUserCmd* pCmd, CBaseEntity* pLocal)
 	if (WeaponVars.bAimAtBacktrack)
 		return;
 
-	QAngle angViewPoint;
-	I::Engine->GetViewAngles(angViewPoint);
+	QAngle angViewPoint = I::Engine->GetViewAngles();
 
 	CBaseEntity* pEntity = GetBestEntity(pLocal);
 	if (pEntity == nullptr)
@@ -107,7 +105,7 @@ void CBacktracking::Update(CBaseEntity* pLocal)
 	m_cl_interp_ratio = I::ConVar->FindVar("cl_interp_ratio");
 	m_sv_client_min_interp_ratio = I::ConVar->FindVar("sv_client_min_interp_ratio");
 	m_sv_client_max_interp_ratio = I::ConVar->FindVar("sv_client_max_interp_ratio");
-	m_sv_maxunlag = I::ConVar->FindVar("sv_maxunlag");	
+	m_sv_maxunlag = I::ConVar->FindVar("sv_maxunlag");
 
 	if (!C::Get<bool>(Vars.bBacktracking) || pLocal == nullptr || !pLocal->IsAlive())
 	{
@@ -135,13 +133,21 @@ void CBacktracking::Update(CBaseEntity* pLocal)
 
 		Record_t Record = { };
 
-		*(Vector*)((uintptr_t)pEntity + 0xA0) = pEntity->GetOrigin();
-		*(int*)((uintptr_t)pEntity + 0xA68) = 0;
-		*(int*)((uintptr_t)pEntity + 0xA30) = 0;
+		pEntity->SetAbsOrigin(pEntity->GetOrigin());
+
+		*reinterpret_cast<int*>(reinterpret_cast<std::uintptr_t>(pEntity + 0xA68)) = 0;
+		*reinterpret_cast<int*>(reinterpret_cast<std::uintptr_t>(pEntity + 0xA30)) = 0;
+
+		pEntity->GetEffects() |= EF_NOINTERP;
+
+		pEntity->UpdateClientSideAnimations();
+
 		pEntity->InvalidateBoneCache();
 
 		if (!pEntity->SetupBones(Record.arrMatrix.data(), MAXSTUDIOBONES, BONE_USED_BY_ANYTHING, I::Globals->flCurrentTime))
-			continue;	
+			continue;
+
+		pEntity->GetEffects() &= ~EF_NOINTERP;
 
 		Record.vecHitboxPos	 = GetBestHitbox(pLocal, pEntity, Record.arrMatrix);
 		Record.flSimtime	 = pEntity->GetSimulationTime();
@@ -150,65 +156,72 @@ void CBacktracking::Update(CBaseEntity* pLocal)
 		Record.vecHeadPos	 = pEntity->GetHitboxPosition(HITBOX_HEAD, Record.arrMatrix);	
 		Record.pModel		 = I::ModelInfo->GetStudioModel(pEntity->GetModel());
 
-		m_arrRecords[i].push_front(Record);
+		if (IsValid(Record.flSimtime))
+			m_arrRecords[i].push_front(Record);
+		
+		if (auto invalid = std::find_if(std::cbegin(m_arrRecords[i]), std::cend(m_arrRecords[i]),
+		[&](const Record_t& rec)
+		{
+			return !CBacktracking::Get().IsValid(rec.flSimtime);
+		});
+		invalid != std::cend(m_arrRecords[i]))
+		{
+			m_arrRecords[i].erase(invalid, std::cend(m_arrRecords[i]));
+		}
 
-		if (auto invalid = std::find_if(std::cbegin(m_arrRecords[i]), std::cend(m_arrRecords[i]), 
-			[&](const Record_t& rec) 
-			{ 
-				return !CBacktracking::Get().IsValid(rec.flSimtime); 
-			}); 
-			invalid != std::cend(m_arrRecords[i]))
-
-		m_arrRecords[i].erase(invalid, std::cend(m_arrRecords[i]));
-
-		while (m_arrRecords[i].size() > TIME_TO_TICKS(C::Get<int>(Vars.iBacktrackingTime) / 1000.f))
+		while (m_arrRecords[i].size() > (C::Get<bool>(Vars.bMiscFakeLatency) ?
+			TIME_TO_TICKS(static_cast<float>(C::Get<int>(Vars.iBacktrackingTime)) + (static_cast<float>(C::Get<int>(Vars.iMiscFakeLatencyAmount)) / 1000.f)) :
+			TIME_TO_TICKS(C::Get<int>(Vars.iBacktrackingTime) / 1000.f)))
+		{
 			m_arrRecords[i].pop_back();
+		}
 	}
 }
 
 float CBacktracking::GetLerp()
-{
-	int iUpdateRate = m_cl_updaterate->GetInt();
+{	
+	int iUpdateRate = 64;
+	if (m_cl_updaterate)
+		iUpdateRate = m_cl_updaterate->GetInt();
 
 	if (m_sv_minupdaterate && m_sv_maxupdaterate)
 		iUpdateRate = m_sv_maxupdaterate->GetInt();
 
-	float flRatio = m_cl_interp_ratio->GetFloat();
-
-	if (flRatio == 0)
-		flRatio = 1.0f;
-
-	float flLerp = m_cl_interp->GetFloat();
+	float flRatio = 1.f; 
+	if (m_cl_interp_ratio)
+		flRatio = m_cl_interp_ratio->GetFloat();
+	
+	float flLerp = I::Globals->flIntervalPerTick;
+	if (m_cl_interp)
+		float flLerp = m_cl_interp->GetFloat();
 
 	if (m_sv_client_min_interp_ratio && m_sv_client_max_interp_ratio && m_sv_client_min_interp_ratio->GetFloat() != 1)
-		flRatio = std::clamp(flRatio, m_sv_client_min_interp_ratio->GetFloat(), m_sv_client_max_interp_ratio->GetFloat());
+		flRatio = std::min(std::max(flRatio, m_sv_client_min_interp_ratio->GetFloat()), m_sv_client_max_interp_ratio->GetFloat());
 
 	return std::max(flLerp, (flRatio / iUpdateRate));
 }
 
 bool CBacktracking::IsValid(float flSimtime)
 {
-	const INetChannelInfo* pNetChannel = I::Engine->GetNetChannelInfo();
-	if (!pNetChannel)
-		return false;
-
 	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
 	if (pLocal == nullptr)
 		return false;
 
-	float flCurTime = I::Globals->flCurrentTime;
+	float flCurTime = TICKS_TO_TIME(pLocal->GetTickBase());
 
 	float flCorrect = 0.f;
 
-	flCorrect += pNetChannel->GetLatency(FLOW_OUTGOING);
-	flCorrect += pNetChannel->GetLatency(FLOW_INCOMING);
-	flCorrect += GetLerp();
+	flCorrect += GetLatency(true, true); // add the total latency
 
-	flCorrect = std::clamp(flCorrect, 0.f, m_sv_maxunlag->GetFloat());
+	flCorrect += GetLerp(); // add interpolation
+
+	if (C::Get<bool>(Vars.bMiscFakeLatency))
+		flCorrect += C::Get<int>(Vars.iMiscFakeLatencyAmount); // add the fake latency
+
+	flCorrect = std::clamp(flCorrect, 0.f, m_sv_maxunlag->GetFloat()); // clamp to unlag
 
 	float flDeltaTime = flCorrect - (flCurTime - flSimtime);
-
-	if (flSimtime < std::floorf(flCurTime - m_sv_maxunlag->GetFloat()))
+	if (flSimtime < std::floorf(flCurTime - m_sv_maxunlag->GetFloat())) // account for deadtime
 		return false;
 
 	return std::abs(flDeltaTime) <= 0.2f;	
@@ -220,9 +233,10 @@ void CBacktracking::DrawHitbox(std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix
 		return;
 
 	mstudiohitboxset_t* pSet = pModel->GetHitboxSet(0);
-
 	if (pSet == nullptr)
 		return;
+
+	static CConVar* sv_showlagcompensation_duration = I::ConVar->FindVar("sv_showlagcompensation_duration");
 
 	for (int i = 0; i < pSet->nHitboxes; i++)
 	{
@@ -234,7 +248,7 @@ void CBacktracking::DrawHitbox(std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix
 		Vector vecMin = M::VectorTransform(pHitbox->vecBBMin, arrMatrix.at(pHitbox->iBone));
 		Vector vecMax = M::VectorTransform(pHitbox->vecBBMax, arrMatrix.at(pHitbox->iBone));
 
-		I::DebugOverlay->DrawPill(vecMin, vecMax, pHitbox->flRadius, 255, 255, 255, 255, I::ConVar->FindVar("sv_showlagcompensation_duration")->GetFloat(), 0, 0);
+		I::DebugOverlay->DrawPill(vecMin, vecMax, pHitbox->flRadius, 255, 255, 255, 255, sv_showlagcompensation_duration->GetFloat(), 0, 0);
 	}
 }
 
@@ -298,8 +312,8 @@ CBaseEntity* CBacktracking::GetBestEntity(CBaseEntity* pLocal)
 {
 	CBaseEntity* pBestEntity = nullptr;
 	float flBestDelta = std::numeric_limits<float>::max();
-	Vector vecLocalEyePos = pLocal->GetEyePosition();
-	QAngle angLocalViewAngles = I::Engine->GetViewAngles();
+	static Vector vecLocalEyePos = pLocal->GetEyePosition();
+	static QAngle angLocalViewAngles = I::Engine->GetViewAngles();
 
 	for (int i = 1; i <= I::Globals->nMaxClients; i++)
 	{
@@ -328,8 +342,8 @@ Record_t CBacktracking::GetBestRecord(CBaseEntity* pLocal, int iIndex)
 {
 	Record_t bestRecord = { };
 	float flBestDelta = std::numeric_limits<float>::max();
-	Vector vecLocalEyePos = pLocal->GetEyePosition();
-	QAngle angLocalViewAngles = I::Engine->GetViewAngles();
+	static Vector vecLocalEyePos = pLocal->GetEyePosition();
+	static QAngle angLocalViewAngles = I::Engine->GetViewAngles();
 
 	for (auto& record : m_arrRecords[iIndex])
 	{
@@ -344,6 +358,23 @@ Record_t CBacktracking::GetBestRecord(CBaseEntity* pLocal, int iIndex)
 	}
 
 	return bestRecord;
+}
+
+float CBacktracking::GetLatency(bool bOutgoing, bool bIncoming)
+{
+	INetChannelInfo* pNetChannelInfo = I::Engine->GetNetChannelInfo();
+	if (pNetChannelInfo == nullptr)
+		return 0.f;
+
+	float flTotal = 0.f;
+
+	if (bOutgoing)
+		flTotal += pNetChannelInfo->GetAvgLatency(FLOW_OUTGOING);
+
+	if (bIncoming)
+		flTotal += pNetChannelInfo->GetAvgLatency(FLOW_INCOMING);
+
+	return flTotal;
 }
 
 void CBacktracking::ApplyData(Record_t record, CBaseEntity* pEntity)

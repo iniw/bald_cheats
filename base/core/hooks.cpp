@@ -307,7 +307,7 @@ bool FASTCALL H::hkCreateMove(IClientModeShared* thisptr, int edx, float flInput
 		pCmd->angViewPoint.Clamp();
 	}
 
-	C::Get<bool>(Vars.bMiscPingSpike) ? CLagCompensation::Get().UpdateIncomingSequences(pNetChannel) : CLagCompensation::Get().ClearIncomingSequences();
+	C::Get<bool>(Vars.bMiscFakeLatency) ? CLagCompensation::Get().UpdateIncomingSequences(pNetChannel) : CLagCompensation::Get().ClearIncomingSequences();
 
 	// @note: doesnt need rehook cuz detours here
 	if (pNetChannel != nullptr)
@@ -324,6 +324,10 @@ bool FASTCALL H::hkCreateMove(IClientModeShared* thisptr, int edx, float flInput
 
 	// save next global sendpacket state
 	G::bSendPacket = bSendPacket;
+
+	// THIS SMELLS LIKE SHIT !!! IT'S FUCKING DIRTY HOLY SHIIIIT
+	if (C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_DECALS))
+		I::Engine->ExecuteClientCmd(XorStr("r_cleardecals"));
 
 	return false;
 }
@@ -393,11 +397,6 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 	if (pLocal == nullptr)
 		return oFrameStageNotify(thisptr, edx, stage);
 
-
-	// THIS SMELLS LIKE SHIT !!! IT'S FUCKING DIRTY HOLY SHIIIIT
-	if (C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_DECALS))
-		I::Engine->ExecuteClientCmd(XorStr("r_cleardecals"));
-
 	static QAngle angAimPunchOld = { }, angViewPunchOld = { };
 
 	switch (stage)
@@ -409,7 +408,7 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 		 * e.g. resolver or skinchanger and other visuals
 		 */
 
-		if(pLocal != nullptr)
+		if(pLocal != nullptr && I::Engine->IsInGame())
 			CSkinChanger::Get().Run(pLocal);
 
 		break;
@@ -420,7 +419,6 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 		 * data has been received and called postdataupdate on all data recipients
 		 * e.g. now we can modify interpolation, other lagcompensation stuff
 		 */
-
 
 		if (C::Get<bool>(Vars.bBacktracking) && pLocal->IsAlive())
 		{
@@ -444,7 +442,9 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 					}
 				}
 			}
+			
 		}
+
 		break;
 	}
 	case FRAME_NET_UPDATE_END:
@@ -658,14 +658,14 @@ int FASTCALL H::hkSendDatagram(INetChannel* thisptr, int edx, bf_write* pDatagra
 	INetChannelInfo* pNetChannelInfo = I::Engine->GetNetChannelInfo();
 	static CConVar* sv_maxunlag = I::ConVar->FindVar(XorStr("sv_maxunlag"));
 
-	if (!I::Engine->IsInGame() || !C::Get<bool>(Vars.bMiscPingSpike) || pDatagram != nullptr || pNetChannelInfo == nullptr || sv_maxunlag == nullptr)
+	if (!I::Engine->IsInGame() || !C::Get<bool>(Vars.bMiscFakeLatency) || pDatagram != nullptr || pNetChannelInfo == nullptr || sv_maxunlag == nullptr)
 		return oSendDatagram(thisptr, edx, pDatagram);
 
 	int iInReliableStateOld = thisptr->iInReliableState;
 	int iInSequenceNrOld = thisptr->iInSequenceNr;
 
 	// calculate max available fake latency with our real ping to keep it w/o real lags or delays
-	float flMaxLatency = std::max(0.f, std::clamp(static_cast<float>(C::Get<int>(Vars.iMiscLatencyFactor)) / 1000.f, 0.f, sv_maxunlag->GetFloat()) - pNetChannelInfo->GetLatency(FLOW_OUTGOING));
+	float flMaxLatency = std::max(0.f, std::clamp(static_cast<float>(C::Get<int>(Vars.iMiscFakeLatencyAmount)) / 1000.f, 0.f, sv_maxunlag->GetFloat()) - pNetChannelInfo->GetLatency(FLOW_OUTGOING));
 	CLagCompensation::Get().AddLatencyToNetChannel(thisptr, flMaxLatency);
 
 	int iReturn = oSendDatagram(thisptr, edx, pDatagram);

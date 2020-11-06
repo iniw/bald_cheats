@@ -212,7 +212,7 @@ void CSkinChanger::Event(IGameEvent* pEvent, const FNV1A_t uNameHash)
 
 	SkinchangerVariables_t WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[nDefinitionIndex];
 
-	if (WeaponVars.iDefinitionIndexOverride && I::Engine->GetPlayerForUserID(pEvent->GetInt(XorStr("attacker"))) == I::Engine->GetLocalPlayer())
+	if (WeaponVars.bEnabled && WeaponVars.iDefinitionIndexOverride && I::Engine->GetPlayerForUserID(pEvent->GetInt(XorStr("attacker"))) == I::Engine->GetLocalPlayer())
 		pEvent->SetString("weapon", mapItemList[WeaponVars.iDefinitionIndexOverride].szKillIcon);
 }
 

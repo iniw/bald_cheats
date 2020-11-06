@@ -81,7 +81,11 @@ namespace VTABLE
 
 		/* netchannel table */
 		SENDNETMSG = 40,
-		SENDDATAGRAM = 46
+		SENDDATAGRAM = 46,
+
+		/* filesystem table */
+		GETUNVERIFIEDFILHEHASHES = 101,
+		LOOSEFILEALLOWED = 128
 	};
 }
 

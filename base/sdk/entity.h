@@ -614,6 +614,33 @@ public:
 		MEM::CallVFunc<void>(this, 223);
 	}
 
+	bool SetupBonesFixed(std::array<matrix3x4_t, MAXSTUDIOBONES> arrBones, float flCurrentTime)
+	{
+		this->SetAbsOrigin(this->GetOrigin());
+
+		int iBackup1 = *(int*)((uintptr_t)this + 0xA68);
+		int iBackup2 = *(int*)((uintptr_t)this + 0xA30);
+
+		*(int*)((uintptr_t)this + 0xA68) = 0;
+		*(int*)((uintptr_t)this + 0xA30) = 0;
+
+		this->GetEffects() |= EF_NOINTERP;
+
+		this->UpdateClientSideAnimations();
+
+		this->InvalidateBoneCache();
+
+		if (!this->SetupBones(arrBones.data(), MAXSTUDIOBONES, BONE_USED_BY_ANYTHING, flCurrentTime))
+			return false;
+
+		this->GetEffects() &= ~EF_NOINTERP;
+
+		*(int*)((uintptr_t)this + 0xA68) = iBackup1;
+		*(int*)((uintptr_t)this + 0xA30) = iBackup2;
+
+		return true;
+	}
+
 	void PreThink()
 	{
 		MEM::CallVFunc<void>(this, 317);

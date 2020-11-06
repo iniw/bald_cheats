@@ -565,8 +565,8 @@ void T::Miscellaneous()
 			}
 
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1));
-			ImGui::Checkbox(XorStr("fake latency"), &C::Get<bool>(Vars.bMiscPingSpike));
-			ImGui::SliderInt(XorStr("amount"), &C::Get<int>(Vars.iMiscLatencyFactor), 1, 200, "%dms");
+			ImGui::Checkbox(XorStr("fake latency"), &C::Get<bool>(Vars.bMiscFakeLatency));
+			ImGui::SliderInt(XorStr("amount"), &C::Get<int>(Vars.iMiscFakeLatencyAmount), 1, 200, "%dms");
 			ImGui::Checkbox(XorStr("reveal ranks"), &C::Get<bool>(Vars.bMiscRevealRanks));
 			ImGui::Checkbox(XorStr("unlock inventory"), &C::Get<bool>(Vars.bMiscUnlockInventory));
 			ImGui::Checkbox(XorStr("auto accept"), &C::Get<bool>(Vars.bMiscAutoAccept));

@@ -121,7 +121,7 @@ void CVisuals::Store()
 				break;
 
 			// get bomb owner
-			const CBaseEntity* pOwner = I::ClientEntityList->Get<CBaseEntity>(pEntity->GetOwnerEntityHandle());
+			const CBaseEntity* pOwner = I::ClientEntityList->GetFromHandle<CBaseEntity>(pEntity->GetOwnerEntityHandle());
 
 			// check only for dropped bomb, for bomb carrier need another way
 			if (pOwner != nullptr)
@@ -171,8 +171,9 @@ void CVisuals::Store()
 
 			if (!pLocal->IsAlive())
 			{
+				const auto pObserverEntity = I::ClientEntityList->GetFromHandle<CBaseEntity>(pLocal->GetObserverTargetHandle());
 				// check is not spectating current entity
-				if (const auto pObserverEntity = I::ClientEntityList->Get<CBaseEntity>(pLocal->GetObserverTargetHandle()); pObserverEntity != nullptr && pObserverEntity == pEntity && *pLocal->GetObserverMode() == OBS_MODE_IN_EYE)
+				if (pObserverEntity != nullptr && pObserverEntity == pEntity && *pLocal->GetObserverMode() == OBS_MODE_IN_EYE)
 					break;
 			}
 
@@ -235,40 +236,35 @@ void CVisuals::Store()
 		default:
 		{
 			// check for esp state and skip weapon in hands
-			if (!C::Get<bool>(Vars.bEspMain) || !C::Get<bool>(Vars.bEspMainWeapons) || nIndex == EClassIndex::CBaseWeaponWorldModel)
+			if (!C::Get<bool>(Vars.bEspMain) || !C::Get<bool>(Vars.bEspMainWeapons) || nIndex == EClassIndex::CBaseWeaponWorldModel || !pEntity->IsWeapon())
+				break; 
+
+			// cast entity to weapon
+			CBaseCombatWeapon* pWeapon = reinterpret_cast<CBaseCombatWeapon*>(pEntity);
+			if (pWeapon == nullptr)
 				break;
 
-			// world weapons check
-			if (pEntity->IsWeapon())
-			{
-				// cast entity to weapon
-				CBaseCombatWeapon* pWeapon = reinterpret_cast<CBaseCombatWeapon*>(pEntity);
+			const short nDefinitionIndex = pWeapon->GetItemDefinitionIndex();
+			CCSWeaponData* pWeaponData = I::WeaponSystem->GetWeaponData(nDefinitionIndex);
 
-				if (pWeapon == nullptr)
-					break;
+			if (pWeaponData == nullptr || !pWeaponData->IsGun())
+				break;
 
-				const short nDefinitionIndex = pWeapon->GetItemDefinitionIndex();
-				CCSWeaponData* pWeaponData = I::WeaponSystem->GetWeaponData(nDefinitionIndex);
+			// get weapon owner
+			const CBaseEntity* pOwner = I::ClientEntityList->GetFromHandle<CBaseEntity>(pEntity->GetOwnerEntityHandle());
 
-				if (pWeaponData == nullptr || !pWeaponData->IsGun())
-					break;
+			// check only dropped weapons for active weapons we using another way
+			if (pOwner != nullptr)
+				break;
 
-				// get weapon owner
-				const CBaseEntity* pOwner = I::ClientEntityList->Get<CBaseEntity>(pEntity->GetOwnerEntityHandle());
+			// create weapon context
+			Context_t ctx = { };
 
-				// check only dropped weapons for active weapons we using another way
-				if (pOwner != nullptr)
-					break;
+			// get weapon bounding box
+			if (!GetBoundingBox(pEntity, &ctx.box))
+				break;
 
-				// create weapon context
-				Context_t ctx = { };
-
-				// get weapon bounding box
-				if (!GetBoundingBox(pEntity, &ctx.box))
-					break;
-
-				DroppedWeapons(pWeapon, nDefinitionIndex, ctx, flDistance, Color(255, 255, 255, 255), Color(80, 180, 200, 200), Color(40, 40, 40, 50), Color(0, 0, 0, 150));
-			}
+			DroppedWeapons(pWeapon, nDefinitionIndex, ctx, flDistance, Color(255, 255, 255, 255), Color(80, 180, 200, 200), Color(40, 40, 40, 50), Color(0, 0, 0, 150));
 
 			break;
 		}
@@ -441,31 +437,46 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 				}
 				else
 				{
-					auto record = deqRecords[deqRecords.size() - 1];
-					
-					// set color
-					pMaterialBacktrack->ColorModulate(colBacktrack.rBase(), colBacktrack.gBase(), colBacktrack.bBase());
+					Record_t record = { }; // record we are going to render
+					bool found = false;
 
-					// set alpha
-					pMaterialBacktrack->AlphaModulate(colBacktrack.aBase());
+					for (std::deque<Record_t>::reverse_iterator i = deqRecords.rbegin(); i != deqRecords.rend(); ++i) // reverse iterate the record to find the oldest valid record
+					{
+							const auto& element = *i;
+							if (CBacktracking::Get().IsValid(element.flSimtime)) // found it, break
+							{
+								record = element;
+								found = true; // lmao
+								break;
+							}
+					}
 
-					// disable "$ignorez" flag
-					pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+					if (found)
+					{
+						// set color
+						pMaterialBacktrack->ColorModulate(colBacktrack.rBase(), colBacktrack.gBase(), colBacktrack.bBase());
 
-					// set wireframe
-					pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, C::Get<int>(Vars.iEspChamsEnemiesBacktrack) == (int)EVisualsEnemiesChams::WIREFRAME ? true : false);
+						// set alpha
+						pMaterialBacktrack->AlphaModulate(colBacktrack.aBase());
 
-					// override customized material
-					I::StudioRender->ForcedMaterialOverride(pMaterialBacktrack);
+						// disable "$ignorez" flag
+						pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
 
-					// draw material
-					oDrawModel(I::StudioRender, 0, pResults, info, record.arrMatrix.data(), flFlexWeights, flFlexDelayedWeights, record.vecOrigin, nFlags);
+						// set wireframe
+						pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, C::Get<int>(Vars.iEspChamsEnemiesBacktrack) == (int)EVisualsEnemiesChams::WIREFRAME ? true : false);
 
-					// restore material
-					I::StudioRender->ForcedMaterialOverride(nullptr);
+						// override customized material
+						I::StudioRender->ForcedMaterialOverride(pMaterialBacktrack);
 
-					// draw original player
-					oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
+						// draw material
+						oDrawModel(I::StudioRender, 0, pResults, info, record.arrMatrix.data(), flFlexWeights, flFlexDelayedWeights, record.vecOrigin, nFlags);
+
+						// restore material
+						I::StudioRender->ForcedMaterialOverride(nullptr);
+
+						// draw original player
+						oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
+					}
 				}
 			}
 		}
@@ -657,12 +668,12 @@ void CVisuals::Glow(CBaseEntity* pLocal)
 {
 	if (!pLocal->IsAlive())
 	{
-		CBaseEntity* pObserverEntity = I::ClientEntityList->Get<CBaseEntity>(pLocal->GetObserverTargetHandle());
+		CBaseEntity* pObserverEntity = I::ClientEntityList->GetFromHandle<CBaseEntity>(pLocal->GetObserverTargetHandle());
 		if (pObserverEntity != nullptr)
 			pLocal = pObserverEntity;
 	}
 
-	for (int i = 0; i < I::GlowManager->vecGlowObjectDefinitions.Count(); i++)
+	for (std::size_t i = 0U; i < I::GlowManager->vecGlowObjectDefinitions.Count(); i++)
 	{
 		IGlowObjectManager::GlowObject_t& hGlowObject = I::GlowManager->vecGlowObjectDefinitions[i];
 
@@ -674,7 +685,6 @@ void CVisuals::Glow(CBaseEntity* pLocal)
 
 		// get current entity from object handle
 		CBaseEntity* pEntity = hGlowObject.pEntity;
-
 		if (pEntity == nullptr)
 			continue;
 
@@ -685,14 +695,13 @@ void CVisuals::Glow(CBaseEntity* pLocal)
 			continue;
 
 		CBaseClient* pClientClass = pEntity->GetClientClass();
-
 		if (pClientClass == nullptr)
 			continue;
 
 		// get class id
 		const EClassIndex nIndex = pClientClass->nClassID;
 
-		bool bIsVisible = pEntity->IsPlayer() ? pLocal->IsVisible(pEntity, pEntity->GetEyePosition()) : pLocal->IsVisible(pEntity, vecOrigin);
+		bool bIsVisible = pEntity->IsPlayer() ? pLocal->IsVisible(pEntity, pEntity->GetEyePosition(false)) : pLocal->IsVisible(pEntity, vecOrigin);
 
 		switch (nIndex)
 		{
@@ -706,11 +715,11 @@ void CVisuals::Glow(CBaseEntity* pLocal)
 			break;
 		case EClassIndex::CCSPlayer:
 		{
-			if (pEntity->IsDormant() || !pEntity->IsAlive() || !C::Get<bool>(Vars.bEspGlowEnemies) || !pLocal->IsEnemy(pEntity))
+			if (!C::Get<bool>(Vars.bEspGlowEnemies) || pEntity->IsDormant() || !pEntity->IsAlive() || !pLocal->IsEnemy(pEntity))
 				break;
 
 			if (bIsVisible ? C::Get<bool>(Vars.bEspGlowEnemiesVisible) : C::Get<bool>(Vars.bEspGlowEnemiesWall))
-				hGlowObject.Set(bIsVisible ? C::Get<Color>(Vars.colEspGlowEnemiesVisible) : (C::Get<Color>(Vars.colEspGlowEnemiesWall)));
+				hGlowObject.Set(bIsVisible ? C::Get<Color>(Vars.colEspGlowEnemiesVisible) : C::Get<Color>(Vars.colEspGlowEnemiesWall));
 			break;
 		}
 		case EClassIndex::CBaseCSGrenadeProjectile:
@@ -722,7 +731,23 @@ void CVisuals::Glow(CBaseEntity* pLocal)
 				hGlowObject.Set(bIsVisible ? C::Get<Color>(Vars.colEspGlowGrenadesVisible) : C::Get<Color>(Vars.colEspGlowGrenadesWall));
 			break;
 		default:
-			if (C::Get<bool>(Vars.bEspGlowWeapons) && pEntity->IsWeapon() && bIsVisible ? C::Get<bool>(Vars.bEspGlowWeaponsVisible) : C::Get<bool>(Vars.bEspGlowWeaponsWall))
+			if (nIndex == EClassIndex::CBaseWeaponWorldModel || !pEntity->IsWeapon())
+				break;
+			// cast entity to weapon
+			CBaseCombatWeapon* pWeapon = reinterpret_cast<CBaseCombatWeapon*>(pEntity);
+			if (pWeapon == nullptr)
+				break;
+
+			CCSWeaponData* pWeaponData = I::WeaponSystem->GetWeaponData(pWeapon->GetItemDefinitionIndex());
+			if (pWeaponData == nullptr || !pWeaponData->IsGun())
+				break;
+
+			// get weapon owner
+			const CBaseEntity* pOwner = I::ClientEntityList->GetFromHandle<CBaseEntity>(pEntity->GetOwnerEntityHandle());
+			if (pOwner != nullptr)
+				break;
+
+			if (C::Get<bool>(Vars.bEspGlowWeapons) && bIsVisible ? C::Get<bool>(Vars.bEspGlowWeaponsVisible) : C::Get<bool>(Vars.bEspGlowWeaponsWall))
 				hGlowObject.Set(bIsVisible ? C::Get<Color>(Vars.colEspGlowWeaponsVisible) : C::Get<Color>(Vars.colEspGlowWeaponsWall));
 			break;
 		}
@@ -931,8 +956,7 @@ void CVisuals::SpectatorList(const ImVec2& vecScreenSize, CBaseEntity* pLocal)
 {
 	if (!pLocal->IsAlive())
 	{
-		CBaseEntity* pObserverTarget = I::ClientEntityList->Get<CBaseEntity>(pLocal->GetObserverTargetHandle());
-
+		CBaseEntity* pObserverTarget = I::ClientEntityList->GetFromHandle<CBaseEntity>(pLocal->GetObserverTargetHandle());
 		if (pObserverTarget == nullptr)
 			return;
 
@@ -951,8 +975,7 @@ void CVisuals::SpectatorList(const ImVec2& vecScreenSize, CBaseEntity* pLocal)
 		if (pEntity == nullptr || !pEntity->IsPlayer() || pEntity->IsAlive())
 			continue;
 
-		CBaseEntity* pObserverTarget = I::ClientEntityList->Get<CBaseEntity>(pEntity->GetObserverTargetHandle());
-
+		CBaseEntity* pObserverTarget = I::ClientEntityList->GetFromHandle<CBaseEntity>(pEntity->GetObserverTargetHandle());
 		if (pObserverTarget == nullptr || pObserverTarget != pLocal)
 			continue;
 
@@ -1146,7 +1169,7 @@ void CVisuals::PlantedBomb(CPlantedC4* pBomb, float flServerTime, const Vector2D
 	ctx.box = { vecScreen.x - vecSize.x * 0.5f - 2.f, vecScreen.y - vecSize.y * 0.5f, vecScreen.x + vecSize.x * 0.5f + 2.f, vecScreen.y + vecSize.y * 0.5f + 1.f, vecSize.x + 4.f, vecSize.y + 1.f};
 
 	// get defuser entity
-	const CBaseEntity* pDefuser = I::ClientEntityList->Get<CBaseEntity>(pBomb->GetDefuserHandle());
+	const CBaseEntity* pDefuser = I::ClientEntityList->GetFromHandle<CBaseEntity>(pBomb->GetDefuserHandle());
 
 	/* info */
 	// frame

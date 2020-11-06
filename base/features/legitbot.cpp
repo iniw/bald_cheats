@@ -48,12 +48,12 @@ bool CLegitBot::GetTargetData(CBaseEntity* pLocal, Target_t& Target)
 	Target.angAngle = M::CalcAngle(m_vecLocalEyePos, Target.vecHitboxPos).Clamped();
 	Target.flAngleDelta = (Target.angAngle - m_angLocalViewAngles).Clamped().Length();
 	Target.iIndex = Target.pEntity->GetIndex();
+	Target.bShouldAimAtBacktrack = false;
 
 	std::deque<Record_t> deqRecords = CBacktracking::Get().GetPlayerRecord(Target.iIndex);
 	if (deqRecords.empty() || !m_WeaponVars.bAimAtBacktrack) // if we shouldn't aim at backtrack, return
 		return true;
 
-	float flBestDelta = Target.flAngleDelta;
 	for (auto& record : deqRecords)
 	{
 		if (!CBacktracking::Get().IsValid(record.flSimtime))
@@ -62,14 +62,13 @@ bool CLegitBot::GetTargetData(CBaseEntity* pLocal, Target_t& Target)
 		QAngle angRecordAngle = M::CalcAngle(m_vecLocalEyePos, record.vecHitboxPos).Clamped();
 		float flRecordAngleDelta = (angRecordAngle - m_angLocalViewAngles).Clamped().Length();	
 
-		if (flRecordAngleDelta < flBestDelta)	
+		if (flRecordAngleDelta < Target.flAngleDelta)
 		{
 			Target.bShouldAimAtBacktrack = true;
 			Target.Record = record;
 			Target.vecHitboxPos = record.vecHitboxPos;
 			Target.angAngle = angRecordAngle;
 			Target.flAngleDelta = flRecordAngleDelta;
-			flBestDelta = flRecordAngleDelta;
 		}
 	}
 	return true;
@@ -143,7 +142,7 @@ void CLegitBot::FinalizeAngle(CBaseEntity* pLocal, QAngle& angAngle)
 
 	if (!m_WeaponVars.bAimSilent && m_WeaponVars.flAimSmooth > 1.f)
 	{
-		angAngle = m_angLocalViewAngles + (angAngle - m_angLocalViewAngles) / m_WeaponVars.flAimSmooth;
+		angAngle = m_angLocalViewAngles + (angAngle - m_angLocalViewAngles).Clamped() / m_WeaponVars.flAimSmooth;
 		angAngle.Clamp();
 	}
 }
@@ -154,6 +153,8 @@ void CLegitBot::ApplyAngle(CUserCmd* pCmd, QAngle angAngle)
 	{
 		CBacktracking::Get().ApplyData(m_Target.Record, m_Target.pEntity);
 		pCmd->iTickCount = TIME_TO_TICKS(m_Target.Record.flSimtime + CBacktracking::Get().GetLerp());
+		//if (pCmd->iButtons & IN_ATTACK)
+		//	CBacktracking::Get().DrawHitbox(m_Target.Record.arrMatrix, m_Target.Record.pModel);
 	}
 
 	pCmd->angViewPoint = angAngle;
@@ -170,11 +171,7 @@ bool CLegitBot::ShouldShoot(CBaseEntity* pLocal, CUserCmd* pCmd)
 	if (pWeapon == nullptr)
 		return false;
 
-	CWeaponCSBase* pBaseWeapon = static_cast<CWeaponCSBase*>(pWeapon);
-	if (pBaseWeapon == nullptr)
-		return false;
-
-	short nDefinitionIndex = pBaseWeapon->GetItemDefinitionIndex();
+	short nDefinitionIndex = pWeapon->GetItemDefinitionIndex();
 
 	if (IPT::IsKeyDown(m_WeaponVars.iAimKey) || (nDefinitionIndex == WEAPON_REVOLVER && pCmd->iButtons & IN_SECOND_ATTACK)) // also aimbot with the revolver's mouse2
 		return true;
@@ -185,34 +182,31 @@ bool CLegitBot::ShouldShoot(CBaseEntity* pLocal, CUserCmd* pCmd)
 
 bool CLegitBot::CanShoot(CBaseEntity* pLocal, CUserCmd* pCmd)
 {
-	CBaseCombatWeapon* pWeapon = pLocal->GetWeapon();
+	CWeaponCSBase* pWeapon = static_cast<CWeaponCSBase*>(pLocal->GetWeapon());
 	if (pWeapon == nullptr)
 		return false;
 
-	CWeaponCSBase* pBaseWeapon = static_cast<CWeaponCSBase*>(pWeapon);
-	if (pBaseWeapon == nullptr)
-		return false;
+	short nDefinitionIndex = pWeapon->GetItemDefinitionIndex();
 
-	short nDefinitionIndex = pBaseWeapon->GetItemDefinitionIndex();
 	CCSWeaponData* pWeaponData = I::WeaponSystem->GetWeaponData(nDefinitionIndex);
-	float flServerTime = TICKS_TO_TIME(pLocal->GetTickBase());
-
 	if (pWeaponData == nullptr)
 		return false;
 
-	if (pBaseWeapon->GetAmmo() <= 0) // only aim with weapons that have ammo
+	float flServerTime = TICKS_TO_TIME(pLocal->GetTickBase());
+
+	if (pWeapon->GetAmmo() <= 0) // only aim with weapons that have ammo
 		return false;
 
 	if (pWeapon->IsReloading()) // don't aim while reloading @test: pretty sure GetNextAttack() handles this
 		return false;
 
-	if (nDefinitionIndex == WEAPON_REVOLVER && pBaseWeapon->GetFireReadyTime() > flServerTime && !(pCmd->iButtons & IN_SECOND_ATTACK)) // don't aim while cocking the r8
+	if (nDefinitionIndex == WEAPON_REVOLVER && pWeapon->GetFireReadyTime() > flServerTime && !(pCmd->iButtons & IN_SECOND_ATTACK)) // don't aim while cocking the r8
 		return false;
 
 	if (pLocal->GetNextAttack() > flServerTime) // don't aim while doing animations like pulling out the weapon etc
 		return false;
 
-	if (!pWeaponData->bFullAuto && pBaseWeapon->GetNextPrimaryAttack() > flServerTime && nDefinitionIndex != WEAPON_REVOLVER) // only aim between shots if the weapon is full auto (except r8)
+	if (!pWeaponData->bFullAuto && pWeapon->GetNextPrimaryAttack() > flServerTime && nDefinitionIndex != WEAPON_REVOLVER) // only aim between shots if the weapon is full auto (except r8)
 		return false;
 
 	return true;
