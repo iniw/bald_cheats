@@ -7,17 +7,18 @@
 // used: cliententitylistener class
 #include "../sdk/interfaces/icliententitylist.h"
 
+struct EntityObject_t
+{
+	EntityObject_t(CBaseEntity* pEntity, int nIndex) :
+		pEntity(pEntity), nIndex(nIndex) { }
+
+	CBaseEntity* pEntity = nullptr;
+	int	nIndex = 0;
+};
+
 class CEntityListener : public IClientEntityListener // @credits: alpine971
 {
 public:
-	struct EntityObject_t
-	{
-		EntityObject_t(CBaseEntity* pEntity, int nIndex) :
-			pEntity(pEntity), nIndex(nIndex) { }
-
-		CBaseEntity* pEntity = nullptr;
-		int	nIndex = 0;
-	};
 
 	// Get
 	void			Setup();
@@ -30,4 +31,5 @@ public:
 	// Values
 	/* vector of listening players */
 	std::vector<EntityObject_t> vecEntities;
+	std::vector<EntityObject_t> vecLegitBotEntities;
 };

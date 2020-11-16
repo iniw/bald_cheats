@@ -8,15 +8,15 @@
 #include "core/interfaces.h"
 
 #pragma region utilities_get
-template <class C>
+template <class C = DWORD>	
 C* U::FindHudElement(const char* szName)
 {
 	// @note: https://www.unknowncheats.me/forum/counterstrike-global-offensive/342743-finding-sigging-chud-pointer-chud-findelement.html
 
-	static auto pHud = *reinterpret_cast<void**>(MEM::FindPattern(CLIENT_DLL, XorStr("B9 ? ? ? ? 68 ? ? ? ? E8 ? ? ? ? 89")) + 0x1); // @xref: "CHudWeaponSelection"
+	static auto pHud = *reinterpret_cast<DWORD**>(MEM::FindPattern(CLIENT_DLL, XorStr("B9 ? ? ? ? E8 ? ? ? ? 8B 5D 08")) + 0x1); // @xref: "CHudWeaponSelection"
 
-	using FindHudElementFn = std::uintptr_t(__thiscall*)(void*, const char*);
-	static auto oFindHudElement = reinterpret_cast<FindHudElementFn>(MEM::FindPattern(CLIENT_DLL, XorStr("55 8B EC 53 8B 5D 08 56 57 8B F9 33 F6 39 77 28"))); // @xref: "[%d] Could not find Hud Element: %s\n"
+	using FindHudElementFn = DWORD(__thiscall*)(void*, const char*);
+	static auto oFindHudElement = reinterpret_cast<FindHudElementFn>(MEM::FindPattern(CLIENT_DLL, XorStr("55 8B EC 53 8B 5D 08 56 57 8B F9 33 F6 39"))); // @xref: "[%d] Could not find Hud Element: %s\n"
 	return reinterpret_cast<C*>(oFindHudElement(pHud, szName));
 }
 #pragma endregion
@@ -24,16 +24,19 @@ C* U::FindHudElement(const char* szName)
 #pragma region utilities_game
 void U::ForceFullUpdate()
 {
-	using ClearHudWeaponIconFn = int(__thiscall*)(void*, int);
-	static auto oClearHudWeaponIcon = reinterpret_cast<ClearHudWeaponIconFn>(MEM::FindPattern(CLIENT_DLL, XorStr("55 8B EC 51 53 56 8B 75 08 8B D9 57 6B"))); // @xref: "WeaponIcon--itemcount"
+	using ClearHudWeaponIconFn = std::int32_t(__thiscall*)(void*, std::int32_t);
+	static auto oClearHudWeaponIcon = reinterpret_cast<ClearHudWeaponIconFn>(MEM::FindPattern(CLIENT_DLL, XorStr("55 8B EC 51 53 56 8B 75 08 8B D9 57 6B FE 2C"))); // @xref: "WeaponIcon--itemcount"
 
 	if (oClearHudWeaponIcon != nullptr)
 	{
 		// get hud weapons
-		if (auto pHudWeapons = FindHudElement<std::uintptr_t>(XorStr("CCSGO_HudWeaponSelection")) - 0x28; pHudWeapons != nullptr)
+		if (auto pHudWeapons = reinterpret_cast<HudWeapons_t*>(std::uintptr_t(FindHudElement<std::uintptr_t>(XorStr("CCSGO_HudWeaponSelection"))) - 0xA0); pHudWeapons != nullptr)
 		{
+			if (!*pHudWeapons->GetWeaponCount())
+				return;
+
 			// go through all weapons
-			for (std::size_t i = 0; i < *(pHudWeapons + 0x20); i++)
+			for (std::size_t i = 0; i < *pHudWeapons->GetWeaponCount(); i++)
 				i = oClearHudWeaponIcon(pHudWeapons, i);
 		}
 	}
@@ -87,6 +90,14 @@ bool U::PrecacheModel(const char* szModelName)
 	}
 
 	return true;
+}
+
+void U::LoadSkybox(const char* szSkyName)
+{
+	using LoadNamedSkyFn = void(__fastcall*)(const char*);
+	static auto LoadNamedSky = reinterpret_cast<LoadNamedSkyFn>(MEM::FindPattern(ENGINE_DLL, XorStr("55 8B EC 81 EC ? ? ? ? 56 57 8B F9 C7 45")));
+
+	LoadNamedSky(szSkyName);
 }
 
 IClientNetworkable* U::CreateDLLEntity(int iEntity, EClassIndex nClassID, int nSerial)

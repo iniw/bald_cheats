@@ -107,6 +107,18 @@ public:
 		return Color(arrBase[0], arrBase[1], arrBase[2], arrBase[3]);
 	}
 
+	Color Interpolate(Color colTo, float flAmount) const
+	{
+		Color colFinal = { };
+
+		colFinal.arrColor.at(0) = std::clamp((colTo.r() - this->r()) * flAmount + this->r(), 0.f, 255.f);
+		colFinal.arrColor.at(1) = std::clamp((colTo.g() - this->g()) * flAmount + this->g(), 0.f, 255.f);
+		colFinal.arrColor.at(2) = std::clamp((colTo.b() - this->b()) * flAmount + this->b(), 0.f, 255.f);
+		colFinal.arrColor.at(3) = std::clamp((colTo.a() - this->a()) * flAmount + this->a(), 0.f, 255.f);
+
+		return colFinal;
+	}
+
 	float Hue() const
 	{
 		if (arrColor.at(0) == arrColor.at(1) && arrColor.at(1) == arrColor.at(2))

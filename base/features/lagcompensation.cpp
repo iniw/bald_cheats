@@ -12,14 +12,6 @@
 // used: GetTickbase
 #include "prediction.h"
 
-void CLagCompensation::Run(CUserCmd* pCmd)
-{
-	/*
-	 * we have much public info for that
-	 * now it is your own way gl
-	 */
-}
-
 void CLagCompensation::UpdateIncomingSequences(INetChannel* pNetChannel)
 {
 	if (pNetChannel == nullptr)
@@ -73,10 +65,8 @@ void CBacktracking::Run(CUserCmd* pCmd, CBaseEntity* pLocal)
 		return;
 
 	LegitbotVariables_t WeaponVars = C::Get<std::vector<LegitbotVariables_t>>(Vars.vecLegitVars)[iWeaponType];
-	if (WeaponVars.bAimAtBacktrack)
+	if (C::Get<bool>(Vars.bLegit) && WeaponVars.bAimAtBacktrack && CLegitBot::Get().m_Target.bShouldAimAtBacktrack) // if we are currently aiming at a record
 		return;
-
-	QAngle angViewPoint = I::Engine->GetViewAngles();
 
 	CBaseEntity* pEntity = GetBestEntity(pLocal);
 	if (pEntity == nullptr)
@@ -87,25 +77,19 @@ void CBacktracking::Run(CUserCmd* pCmd, CBaseEntity* pLocal)
 		return;
 
 	if (pCmd->iButtons & IN_ATTACK)
-	{
-		ApplyData(bestRecord, pEntity);
-
 		pCmd->iTickCount = TIME_TO_TICKS(bestRecord.flSimtime + GetLerp());
-
-		RestoreData(pEntity);
-	}
 }
 
 void CBacktracking::Update(CBaseEntity* pLocal)
 {
-	m_cl_updaterate = I::ConVar->FindVar("cl_updaterate");
-	m_sv_minupdaterate = I::ConVar->FindVar("sv_minupdaterate");
-	m_sv_maxupdaterate = I::ConVar->FindVar("sv_maxupdaterate");
-	m_cl_interp = I::ConVar->FindVar("cl_interp");
-	m_cl_interp_ratio = I::ConVar->FindVar("cl_interp_ratio");
-	m_sv_client_min_interp_ratio = I::ConVar->FindVar("sv_client_min_interp_ratio");
-	m_sv_client_max_interp_ratio = I::ConVar->FindVar("sv_client_max_interp_ratio");
-	m_sv_maxunlag = I::ConVar->FindVar("sv_maxunlag");
+	m_cl_updaterate = I::ConVar->FindVar(XorStr("cl_updaterate"));
+	m_sv_minupdaterate = I::ConVar->FindVar(XorStr("sv_minupdaterate"));
+	m_sv_maxupdaterate = I::ConVar->FindVar(XorStr("sv_maxupdaterate"));
+	m_cl_interp = I::ConVar->FindVar(XorStr("cl_interp"));
+	m_cl_interp_ratio = I::ConVar->FindVar(XorStr("cl_interp_ratio"));
+	m_sv_client_min_interp_ratio = I::ConVar->FindVar(XorStr("sv_client_min_interp_ratio"));
+	m_sv_client_max_interp_ratio = I::ConVar->FindVar(XorStr("sv_client_max_interp_ratio"));
+	m_sv_maxunlag = I::ConVar->FindVar(XorStr("sv_maxunlag"));
 
 	if (!C::Get<bool>(Vars.bBacktracking) || pLocal == nullptr || !pLocal->IsAlive())
 	{
@@ -122,7 +106,7 @@ void CBacktracking::Update(CBaseEntity* pLocal)
 
 		CBaseEntity* pEntity = I::ClientEntityList->Get<CBaseEntity>(i);
 
-		if (!IsValid(pLocal, pEntity))
+		if (pEntity == nullptr || !pEntity->IsPlayer() || !pEntity->IsAlive() || pEntity->IsDormant() || pEntity->HasImmunity())
 		{
 			m_arrRecords[i].clear();
 			continue;
@@ -133,45 +117,28 @@ void CBacktracking::Update(CBaseEntity* pLocal)
 
 		Record_t Record = { };
 
-		pEntity->SetAbsOrigin(pEntity->GetOrigin());
-
-		*reinterpret_cast<int*>(reinterpret_cast<std::uintptr_t>(pEntity + 0xA68)) = 0;
-		*reinterpret_cast<int*>(reinterpret_cast<std::uintptr_t>(pEntity + 0xA30)) = 0;
-
-		pEntity->GetEffects() |= EF_NOINTERP;
-
-		pEntity->UpdateClientSideAnimations();
-
-		pEntity->InvalidateBoneCache();
-
-		if (!pEntity->SetupBones(Record.arrMatrix.data(), MAXSTUDIOBONES, BONE_USED_BY_ANYTHING, I::Globals->flCurrentTime))
+		if (!pEntity->SetupBonesFixed(Record.arrBoneMatrixes, BONE_USED_BY_ANYTHING, I::Globals->flCurrentTime))
 			continue;
 
-		pEntity->GetEffects() &= ~EF_NOINTERP;
-
-		Record.vecHitboxPos	 = GetBestHitbox(pLocal, pEntity, Record.arrMatrix);
 		Record.flSimtime	 = pEntity->GetSimulationTime();
 		Record.vecOrigin	 = pEntity->GetOrigin();
 		Record.vecAbsOrigin	 = pEntity->GetAbsOrigin();
-		Record.vecHeadPos	 = pEntity->GetHitboxPosition(HITBOX_HEAD, Record.arrMatrix);	
-		Record.pModel		 = I::ModelInfo->GetStudioModel(pEntity->GetModel());
+		Record.pStudioModel	 = I::ModelInfo->GetStudioModel(pEntity->GetModel());
+		Record.vecHeadPos	 = pEntity->GetHitboxPosition(HITBOX_HEAD, Record.arrBoneMatrixes, Record.pStudioModel);	
 
-		if (IsValid(Record.flSimtime))
-			m_arrRecords[i].push_front(Record);
+		m_arrRecords[i].push_front(Record);
 		
-		if (auto invalid = std::find_if(std::cbegin(m_arrRecords[i]), std::cend(m_arrRecords[i]),
+		if (auto itInvalid = std::find_if(std::cbegin(m_arrRecords[i]), std::cend(m_arrRecords[i]),
 		[&](const Record_t& rec)
 		{
 			return !CBacktracking::Get().IsValid(rec.flSimtime);
-		});
-		invalid != std::cend(m_arrRecords[i]))
+		}); 
+		itInvalid != std::cend(m_arrRecords[i]))
 		{
-			m_arrRecords[i].erase(invalid, std::cend(m_arrRecords[i]));
+			m_arrRecords[i].erase(itInvalid, std::cend(m_arrRecords[i]));
 		}
 
-		while (m_arrRecords[i].size() > (C::Get<bool>(Vars.bMiscFakeLatency) ?
-			TIME_TO_TICKS(static_cast<float>(C::Get<int>(Vars.iBacktrackingTime)) + (static_cast<float>(C::Get<int>(Vars.iMiscFakeLatencyAmount)) / 1000.f)) :
-			TIME_TO_TICKS(C::Get<int>(Vars.iBacktrackingTime) / 1000.f)))
+		while (m_arrRecords[i].size() > TIME_TO_TICKS((C::Get<int>(Vars.iBacktrackingTime) + ((C::Get<bool>(Vars.bMiscFakeLatency)) ? C::Get<int>(Vars.iMiscFakeLatencyAmount) : 0.f )) / 1000.f))
 		{
 			m_arrRecords[i].pop_back();
 		}
@@ -224,15 +191,15 @@ bool CBacktracking::IsValid(float flSimtime)
 	if (flSimtime < std::floorf(flCurTime - m_sv_maxunlag->GetFloat())) // account for deadtime
 		return false;
 
-	return std::abs(flDeltaTime) <= 0.2f;	
+	return std::fabs(flDeltaTime) <= 0.2f;
 }
 
-void CBacktracking::DrawHitbox(std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix, studiohdr_t* pModel)
+void CBacktracking::DrawHitbox(std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix, studiohdr_t* pStudioModel)
 {
-	if (pModel == nullptr)
+	if (pStudioModel == nullptr)
 		return;
 
-	mstudiohitboxset_t* pSet = pModel->GetHitboxSet(0);
+	mstudiohitboxset_t* pSet = pStudioModel->GetHitboxSet(0);
 	if (pSet == nullptr)
 		return;
 
@@ -252,68 +219,12 @@ void CBacktracking::DrawHitbox(std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix
 	}
 }
 
-bool CBacktracking::IsValid(CBaseEntity* pLocal, CBaseEntity* pEntity)
-{
-	if (pEntity == nullptr) // obvious
-		return false;
-
-	if (!pEntity->IsPlayer()) // only aim at players
-		return false;
-
-	if (!pEntity->IsAlive()) // only aim at alive players
-		return false;
-
-	if (pEntity->IsDormant()) // only aim at non-dormant players
-		return false;
-
-	if (!pLocal->IsEnemy(pEntity)) // only aim at enemies
-		return false;
-
-	if (pEntity->HasImmunity()) // only aim at non-immune players
-		return false;
-
-	return true;
-}
-
-Vector CBacktracking::GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix)
-{
-	float iBestDelta = std::numeric_limits<float>::max();
-
-	int iWeaponType = CLegitBot::Get().GetWeaponType(pLocal);
-	if (iWeaponType == -1)
-		return { };
-
-	LegitbotVariables_t WeaponVars = C::Get<std::vector<LegitbotVariables_t>>(Vars.vecLegitVars)[iWeaponType];
-
-	if (WeaponVars.iAimHitbox == (int)ELegitHitboxes::CLOSEST)
-	{
-		Vector vecBestHitboxPos = { };
-
-		for (int i = 0; i < CLegitBot::Get().m_arrClosestHitboxes.size(); i++)
-		{
-			Vector vecHitboxPos = pEntity->GetHitboxPosition(CLegitBot::Get().m_arrClosestHitboxes.at(i), arrCustomMatrix);
-			QAngle angAngle = M::CalcAngle(pLocal->GetEyePosition(), vecHitboxPos).Clamped();
-			float flDelta = (angAngle - I::Engine->GetViewAngles()).Clamped().Length();
-
-			if (flDelta < iBestDelta)
-			{
-				vecBestHitboxPos = vecHitboxPos;
-				iBestDelta = flDelta;
-			}
-		}
-
-		return vecBestHitboxPos;
-	}
-	else
-		return pEntity->GetHitboxPosition(CLegitBot::Get().m_arrHitboxes.at(WeaponVars.iAimHitbox - 1), arrCustomMatrix);
-}
-
 CBaseEntity* CBacktracking::GetBestEntity(CBaseEntity* pLocal)
 {
 	CBaseEntity* pBestEntity = nullptr;
 	float flBestDelta = std::numeric_limits<float>::max();
-	static Vector vecLocalEyePos = pLocal->GetEyePosition();
-	static QAngle angLocalViewAngles = I::Engine->GetViewAngles();
+	Vector vecLocalEyePos = pLocal->GetEyePosition();
+	QAngle angLocalViewAngles = I::Engine->GetViewAngles();
 
 	for (int i = 1; i <= I::Globals->nMaxClients; i++)
 	{
@@ -322,13 +233,13 @@ CBaseEntity* CBacktracking::GetBestEntity(CBaseEntity* pLocal)
 
 		CBaseEntity* pEntity = I::ClientEntityList->Get<CBaseEntity>(i);
 
-		if (!IsValid(pLocal, pEntity))
+		if (pEntity == nullptr || !pEntity->IsPlayer() || !pEntity->IsAlive() || pEntity->IsDormant() || pEntity->HasImmunity())
 			continue;
 
 		QAngle angAngle = M::CalcAngle(vecLocalEyePos, pEntity->GetEyePosition(false)).Clamped();
 		float flDelta = (angAngle - angLocalViewAngles).Clamped().Length();
 
-		if (flDelta <= flBestDelta)
+		if (flDelta < flBestDelta)
 		{
 			flBestDelta = flDelta;
 			pBestEntity = pEntity;
@@ -347,6 +258,9 @@ Record_t CBacktracking::GetBestRecord(CBaseEntity* pLocal, int iIndex)
 
 	for (auto& record : m_arrRecords[iIndex])
 	{
+		if (!IsValid(record.flSimtime))
+			continue;
+
 		QAngle angAngle = M::CalcAngle(vecLocalEyePos, record.vecHeadPos).Clamped();
 		float flDelta = (angAngle - angLocalViewAngles).Clamped().Length();
 
@@ -395,7 +309,17 @@ void CBacktracking::RestoreData(CBaseEntity* pEntity)
 	pEntity->GetSimulationTime() = m_orgData.flSimtime;
 }
 
-std::deque<Record_t> CBacktracking::GetPlayerRecord(int iIndex)
+void CBacktracking::GetValidRecords(int iIndex, std::deque<Record_t>& deqRecords)
 {
-	return m_arrRecords[iIndex];
+	for (auto& record : m_arrRecords[iIndex])
+	{
+		if (!IsValid(record.flSimtime))
+			continue;
+
+		deqRecords.push_front(record);
+	}
+}
+
+void CBacktracking::Draw()
+{
 }

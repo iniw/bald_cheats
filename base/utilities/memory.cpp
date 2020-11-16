@@ -113,7 +113,6 @@ bool MEM::GetSectionInfo(std::uintptr_t uBaseAddress, const std::string& szSecti
 std::uintptr_t* MEM::GetVTablePointer(std::string_view szModuleName, std::string_view szTableName)
 {
 	std::uintptr_t uBaseAddress = reinterpret_cast<std::uintptr_t>(GetModuleHandle(szModuleName.data()));
-
 	if (!uBaseAddress)
 		return nullptr;
 

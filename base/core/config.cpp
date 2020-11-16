@@ -150,6 +150,7 @@ bool C::Save(std::string_view szFileName)
 					sub.push_back(weapon.iAimKey);
 					sub.push_back(weapon.flAimFov);
 					sub.push_back(weapon.iAimHitbox);
+					sub.push_back(weapon.iAimPriorityHitbox);
 					sub.push_back(weapon.bAimAtBacktrack);
 					sub.push_back(weapon.bAimSilent);
 					sub.push_back(weapon.flAimSmooth);
@@ -356,15 +357,16 @@ bool C::Load(std::string_view szFileName)
 				{
 					if (i < vecVars.size())
 					{
-						vecVars.at(i).iAimKey				= vector.at(i * 9 + 0).get<int>();
-						vecVars.at(i).flAimFov				= vector.at(i * 9 + 1).get<float>();
-						vecVars.at(i).iAimHitbox			= vector.at(i * 9 + 2).get<int>();
-						vecVars.at(i).bAimAtBacktrack		= vector.at(i * 9 + 3).get<bool>();
-						vecVars.at(i).bAimSilent			= vector.at(i * 9 + 4).get<bool>();
-						vecVars.at(i).flAimSmooth			= vector.at(i * 9 + 5).get<float>();
-						vecVars.at(i).bAimRCS				= vector.at(i * 9 + 6).get<bool>();
-						vecVars.at(i).bAimAutoWall			= vector.at(i * 9 + 7).get<bool>();
-						vecVars.at(i).iAimAutoWallMinDamage = vector.at(i * 9 + 8).get<int>();
+						vecVars.at(i).iAimKey				= vector.at(i * 10 + 0).get<int>();
+						vecVars.at(i).flAimFov				= vector.at(i * 10 + 1).get<float>();
+						vecVars.at(i).iAimHitbox			= vector.at(i * 10 + 2).get<int>();
+						vecVars.at(i).iAimPriorityHitbox	= vector.at(i * 10 + 3).get<int>();
+						vecVars.at(i).bAimAtBacktrack		= vector.at(i * 10 + 4).get<bool>();
+						vecVars.at(i).bAimSilent			= vector.at(i * 10 + 5).get<bool>();
+						vecVars.at(i).flAimSmooth			= vector.at(i * 10 + 6).get<float>();
+						vecVars.at(i).bAimRCS				= vector.at(i * 10 + 7).get<bool>();
+						vecVars.at(i).bAimAutoWall			= vector.at(i * 10 + 8).get<bool>();
+						vecVars.at(i).iAimAutoWallMinDamage = vector.at(i * 10 + 9).get<int>();
 					}
 				}
 

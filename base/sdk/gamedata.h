@@ -56,6 +56,8 @@ namespace GD
 static constexpr std::pair<int, const char*>  arrKnifeNames[]
 {
 	{WEAPON_NONE, "default"},
+	{WEAPON_KNIFE, "default ct"},
+	{WEAPON_KNIFE_T, "default t"},
 	{WEAPON_KNIFE_BAYONET, "bayonet"},
 	{WEAPON_KNIFE_SURVIVAL_BOWIE, "bowie knife"},
 	{WEAPON_KNIFE_BUTTERFLY, "butterfly knife"},
@@ -81,10 +83,10 @@ static constexpr std::pair<int, const char*> arrGlovesNames[] =
 {
 	{WEAPON_NONE, "default"},
 	{GLOVE_STUDDED_BLOODHOUND, "bloodhound"},
-	{GLOVE_LEATHER_HANDWRAPS, "handwrap"},
+	{GLOVE_LEATHER_HANDWRAPS, "handwraps"},
 	{GLOVE_HYDRA, "hydra"},
-	{GLOVE_SLICK, "slick"},
-	{GLOVE_SPORTY, "sporty"},
+	{GLOVE_SLICK, "driver"},
+	{GLOVE_SPORTY, "sport"},
 	{GLOVE_MOTORCYCLE, "motorcycle"},
 	{GLOVE_SPECIALIST, "specialist"}
 };

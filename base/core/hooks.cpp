@@ -48,17 +48,14 @@ bool H::Setup()
 	if (!DTR::EndScene.Create(MEM::GetVFunc(I::DirectDevice, VTABLE::ENDSCENE), &hkEndScene))
 		return false;
 
+	if (!DTR::LevelInitPostEntity.Create(MEM::GetVFunc(I::Client, VTABLE::LEVELINITPOSTENTITY), &hkLevelInitPostEntity))
+		return false;
+
 	if (!DTR::FrameStageNotify.Create(MEM::GetVFunc(I::Client, VTABLE::FRAMESTAGENOTIFY), &hkFrameStageNotify))
 		return false;
 
 	if (!DTR::OverrideView.Create(MEM::GetVFunc(I::ClientMode, VTABLE::OVERRIDEVIEW), &hkOverrideView))
 		return false;
-
-	// @note: be useful for mouse event aimbot
-	#if 0
-	if (!DTR::OverrideMouseInput.Replace(MEM::GetVFunc(I::ClientMode, VTABLE::OVERRIDEMOUSEINPUT), &hkOverrideMouseInput))
-		return false;
-	#endif
 
 	if (!DTR::CreateMove.Create(MEM::GetVFunc(I::ClientMode, VTABLE::CREATEMOVE), &hkCreateMove))
 		return false;
@@ -70,6 +67,9 @@ bool H::Setup()
 		return false;
 
 	if (!DTR::IsConnected.Create(MEM::GetVFunc(I::Engine, VTABLE::ISCONNECTED), &hkIsConnected))
+		return false;
+
+	if (!DTR::IsHLTV.Create(MEM::GetVFunc(I::Engine, VTABLE::ISHLTV), &hkIsHLTV))
 		return false;
 
 	if (!DTR::ListLeavesInBox.Create(MEM::GetVFunc(I::Engine->GetBSPTreeQuery(), VTABLE::LISTLEAVESINBOX), &hkListLeavesInBox))
@@ -100,8 +100,33 @@ bool H::Setup()
 		return false;
 
 	static CConVar* sv_cheats = I::ConVar->FindVar(XorStr("sv_cheats"));
+	if (!DTR::sv_cheatsGetBool.Create(MEM::GetVFunc(sv_cheats, VTABLE::GETBOOL), &hksv_cheatsGetBool))
+		return false;
 
-	if (!DTR::SvCheatsGetBool.Create(MEM::GetVFunc(sv_cheats, VTABLE::GETBOOL), &hkSvCheatsGetBool))
+	/*
+	static CConVar* r_3dsky = I::ConVar->FindVar(XorStr("r_3dsky"));
+	if (!DTR::r_3dskyGetInt.Create(MEM::GetVFunc(r_3dsky, VTABLE::GETINT), &hkr_3dskyGetInt))
+		return false;
+
+	static CConVar* cl_csm_enabled = I::ConVar->FindVar(XorStr("cl_csm_enabled"));
+	if (!DTR::cl_csm_enabledGetBool.Create(MEM::GetVFunc(cl_csm_enabled, VTABLE::GETBOOL), &hkcl_csm_enabledGetBool))
+		return false;
+	
+	static CConVar* mat_postprocess_enable = I::ConVar->FindVar(XorStr("mat_postprocess_enable"));
+	if (!DTR::mat_postprocess_enableGetBool.Create(MEM::GetVFunc(mat_postprocess_enable, VTABLE::GETBOOL), &hkmat_postprocess_enableGetBool))
+		return false;
+
+	static CConVar* weapon_debug_spread_show = I::ConVar->FindVar(XorStr("weapon_debug_spread_show"));
+	if (!DTR::weapon_debug_spread_showGetInt.Create(MEM::GetVFunc(weapon_debug_spread_show, VTABLE::GETINT), &hkweapon_debug_spread_showGetInt))
+		return false;
+	*/
+
+	static auto pPlayerTable = MEM::GetVTablePointer(CLIENT_DLL, XorStr("C_CSPlayer"));	
+
+	if (!DTR::DoExtraBoneProcessing.Create(MEM::GetVFunc(pPlayerTable, VTABLE::DOEXTRABONEPROCESSING), &hkDoExtraBoneProcessing))
+		return false;
+
+	if (!DTR::StandardBlendingRules.Create(MEM::GetVFunc(pPlayerTable, VTABLE::STANDARDBLENDINGRULES), &hkStandardBlendingRules))
 		return false;
 
 	return true;
@@ -113,13 +138,13 @@ void H::Restore()
 	DTR::EndScene.Remove();
 	DTR::FrameStageNotify.Remove();
 	DTR::OverrideView.Remove();
-	DTR::OverrideMouseInput.Remove();
 	DTR::CreateMove.Remove();
 	DTR::SendNetMsg.Remove();
 	DTR::SendDatagram.Remove();
 	DTR::GetViewModelFOV.Remove();
 	DTR::DoPostScreenEffects.Remove();
 	DTR::IsConnected.Remove();
+	DTR::IsHLTV.Remove();
 	DTR::ListLeavesInBox.Remove();
 	DTR::PaintTraverse.Remove();
 	DTR::DrawModel.Remove();
@@ -129,7 +154,15 @@ void H::Restore()
 	DTR::RetrieveMessage.Remove();
 	DTR::LockCursor.Remove();
 	DTR::PlaySoundSurface.Remove();
-	DTR::SvCheatsGetBool.Remove();
+	DTR::sv_cheatsGetBool.Remove();
+	/*
+	DTR::r_3dskyGetInt.Remove();
+	DTR::cl_csm_enabledGetBool.Remove();
+	DTR::mat_postprocess_enableGetBool.Remove();
+	DTR::weapon_debug_spread_showGetInt.Remove();
+	*/
+	DTR::DoExtraBoneProcessing.Remove();
+	DTR::StandardBlendingRules.Remove();
 
 	// @note: also should works but makes it undebuggable
 	#if 0
@@ -142,6 +175,7 @@ void H::Restore()
 #pragma endregion
 
 #pragma region hooks_handlers
+#pragma region hooks_directx
 long D3DAPI H::hkReset(IDirect3DDevice9* pDevice, D3DPRESENT_PARAMETERS* pPresentationParameters)
 {
 	static auto oReset = DTR::Reset.GetOriginal<decltype(&hkReset)>();
@@ -217,7 +251,9 @@ long D3DAPI H::hkEndScene(IDirect3DDevice9* pDevice)
 
 	return oEndScene(pDevice);
 }
+#pragma endregion
 
+#pragma region hooks_clientmode
 bool FASTCALL H::hkCreateMove(IClientModeShared* thisptr, int edx, float flInputSampleTime, CUserCmd* pCmd)
 {
 	static auto oCreateMove = DTR::CreateMove.GetOriginal<decltype(&hkCreateMove)>();
@@ -288,17 +324,22 @@ bool FASTCALL H::hkCreateMove(IClientModeShared* thisptr, int edx, float flInput
 		if (C::Get<bool>(Vars.bTrigger))
 			CTriggerBot::Get().Run(pCmd, pLocal);
 
-		if (C::Get<bool>(Vars.bBacktracking))
-			CBacktracking::Get().Run(pCmd, pLocal);
+		//if (C::Get<bool>(Vars.bBacktracking))
+		//	CBacktracking::Get().Run(pCmd, pLocal);
 	}
 	CPrediction::Get().End(pCmd, pLocal);
 
+	CBaseEntity* pLocalPostPred = CBaseEntity::GetLocalPlayer();
+
 	int iPostFlags = CBaseEntity::GetLocalPlayer()->GetFlags();
 
-	CMiscellaneous::Get().PostPrediction(pCmd, iPreFlags, iPostFlags);
+	CMiscellaneous::Get().PostPrediction(pCmd, iPreFlags, pLocalPostPred->GetFlags());
+
+	if (C::Get<int>(Vars.iMiscBlockBotKey) && IPT::IsKeyDown(C::Get<int>(Vars.iMiscBlockBotKey)))
+		CMiscellaneous::Get().BlockBot(pCmd, pLocal);
 
 	if(pLocal->IsAlive())
-		CMiscellaneous::Get().MovementCorrection(pCmd, pLocal, angOldViewPoint);
+		CMiscellaneous::Get().MovementCorrection(pCmd, pLocalPostPred, angOldViewPoint);
 
 	// clamp & normalize view angles
 	if (C::Get<bool>(Vars.bMiscAntiUntrusted))
@@ -332,6 +373,69 @@ bool FASTCALL H::hkCreateMove(IClientModeShared* thisptr, int edx, float flInput
 	return false;
 }
 
+void FASTCALL H::hkOverrideView(IClientModeShared* thisptr, int edx, CViewSetup* pSetup)
+{
+	static auto oOverrideView = DTR::OverrideView.GetOriginal<decltype(&hkOverrideView)>();
+
+	if (!I::Engine->IsInGame() || I::Engine->IsTakingScreenshot())
+		return oOverrideView(thisptr, edx, pSetup);
+
+	// get camera origin
+	G::vecCamera = pSetup->vecOrigin;
+
+	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
+
+	if (pLocal == nullptr || !pLocal->IsAlive())
+		return oOverrideView(thisptr, edx, pSetup);
+
+	CBaseCombatWeapon* pWeapon = pLocal->GetWeapon();
+
+	if (pWeapon == nullptr)
+		return oOverrideView(thisptr, edx, pSetup);
+
+	if (CCSWeaponData* pWeaponData = I::WeaponSystem->GetWeaponData(pWeapon->GetItemDefinitionIndex());
+		pWeaponData != nullptr && std::fpclassify(C::Get<float>(Vars.flScreenCameraFOV)) != FP_ZERO &&
+		// check is we not scoped
+		(pWeaponData->nWeaponType == WEAPONTYPE_SNIPER ? !pLocal->IsScoped() : true))
+		// set camera fov
+		pSetup->flFOV += C::Get<float>(Vars.flScreenCameraFOV);
+
+	G::flFov = pSetup->flFOV;
+
+	oOverrideView(thisptr, edx, pSetup);
+}
+
+float FASTCALL H::hkGetViewModelFOV(IClientModeShared* thisptr, int edx)
+{
+	static auto oGetViewModelFOV = DTR::GetViewModelFOV.GetOriginal<decltype(&hkGetViewModelFOV)>();
+
+	if (!I::Engine->IsInGame() || I::Engine->IsTakingScreenshot())
+		return oGetViewModelFOV(thisptr, edx);
+
+	if (auto pLocal = CBaseEntity::GetLocalPlayer();
+		pLocal != nullptr && pLocal->IsAlive() && std::fpclassify(C::Get<float>(Vars.flScreenViewModelFOV)) != FP_ZERO)
+		return oGetViewModelFOV(thisptr, edx) + C::Get<float>(Vars.flScreenViewModelFOV);
+
+	return oGetViewModelFOV(thisptr, edx);
+}
+
+int FASTCALL H::hkDoPostScreenEffects(IClientModeShared* thisptr, int edx, CViewSetup* pSetup)
+{
+	static auto oDoPostScreenEffects = DTR::DoPostScreenEffects.GetOriginal<decltype(&hkDoPostScreenEffects)>();
+
+	if (!I::Engine->IsInGame() || I::Engine->IsTakingScreenshot())
+		return oDoPostScreenEffects(thisptr, edx, pSetup);
+
+	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
+
+	if (pLocal != nullptr && I::GlowManager != nullptr && C::Get<bool>(Vars.bEspGlow))
+		CVisuals::Get().Glow(pLocal);
+
+	return oDoPostScreenEffects(thisptr, edx, pSetup);
+}
+#pragma endregion
+
+#pragma region hooks_surface
 void FASTCALL H::hkPaintTraverse(ISurface* thisptr, int edx, unsigned int uPanel, bool bForceRepaint, bool bForce)
 {
 	static auto oPaintTraverse = DTR::PaintTraverse.GetOriginal<decltype(&hkPaintTraverse)>();
@@ -345,6 +449,9 @@ void FASTCALL H::hkPaintTraverse(ISurface* thisptr, int edx, unsigned int uPanel
 
 	oPaintTraverse(thisptr, edx, uPanel, bForceRepaint, bForce);
 
+	if (!D::bInitialized)
+		return;
+
 	// @note: we don't render here, only store's data and render it later
 	if (uPanelHash == FNV1A::HashConst("FocusOverlayPanel"))
 	{
@@ -353,6 +460,10 @@ void FASTCALL H::hkPaintTraverse(ISurface* thisptr, int edx, unsigned int uPanel
 
 		// store data to render
 		CVisuals::Get().Store();
+
+		// debugging pourposes
+		CLegitBot::Get().Draw();
+		CBacktracking::Get().Draw();
 
 		// swap given data to safe container
 		D::SwapDrawData();
@@ -377,6 +488,17 @@ void FASTCALL H::hkLockCursor(ISurface* thisptr, int edx)
 
 	oLockCursor(thisptr, edx);
 }
+#pragma endregion
+
+#pragma region hooks_baseclient
+void FASTCALL H::hkLevelInitPostEntity(IBaseClientDll* thisptr, int edx)
+{
+	static auto oLevelInitPreEntity = DTR::LevelInitPostEntity.GetOriginal<decltype(&hkLevelInitPostEntity)>();
+
+	//U::EntityListener.Setup();
+
+	return oLevelInitPreEntity(thisptr, edx);
+}
 
 void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFrameStage stage)
 {
@@ -396,6 +518,8 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 
 	if (pLocal == nullptr)
 		return oFrameStageNotify(thisptr, edx, stage);
+
+	CVisuals::Get().SkyChanger(stage);
 
 	static QAngle angAimPunchOld = { }, angViewPunchOld = { };
 
@@ -429,7 +553,7 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 
 				CBaseEntity* pEntity = I::ClientEntityList->Get<CBaseEntity>(i);
 
-				if (pEntity == nullptr || !pEntity->IsPlayer() || !pEntity->IsAlive() || !pLocal->IsEnemy(pEntity))
+				if (pEntity == nullptr || !pEntity->IsAlive() || !pLocal->IsEnemy(pEntity))
 					continue;
 
 				VarMapping_t* map = pEntity->VarMapping();
@@ -470,20 +594,6 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 
 		//CVisuals::Get().NightMode();
 		CVisuals::Get().Removals();
-
-		for (int i = 1; i <= I::Globals->nMaxClients; i++)
-		{
-			if (i == I::Engine->GetLocalPlayer())
-				continue;
-
-			IClientEntity* pEntity = I::ClientEntityList->Get<IClientEntity>(i);
-
-			if (pEntity == nullptr)
-				continue;
-
-			*(int*)((uintptr_t)pEntity + 0xA30) = I::Globals->iFrameCount;
-			*(int*)((uintptr_t)pEntity + 0xA28) = 0;
-		}
 
 		// no draw smoke
 		for (auto szSmokeMaterial : arrSmokeMaterials)
@@ -551,7 +661,9 @@ void FASTCALL H::hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFra
 
 	oFrameStageNotify(thisptr, edx, stage);
 }
+#pragma endregion
 
+#pragma region hooks_studiorender
 void FASTCALL H::hkDrawModel(IStudioRender* thisptr, int edx, DrawModelResults_t* pResults, const DrawModelInfo_t& info, matrix3x4_t* pBoneToWorld, float* flFlexWeights, float* flFlexDelayedWeights, const Vector& vecModelOrigin, int nFlags)
 {
 	static auto oDrawModel = DTR::DrawModel.GetOriginal<decltype(&hkDrawModel)>();
@@ -611,7 +723,9 @@ int FASTCALL H::hkListLeavesInBox(void* thisptr, int edx, const Vector& vecMins,
 
 	return oListLeavesInBox(thisptr, edx, vecMins, vecMaxs, puList, nListMax);
 }
+#pragma endregion
 
+#pragma region hooks_engineclient
 bool FASTCALL H::hkIsConnected(IEngineClient* thisptr, int edx)
 {
 	static auto oIsConnected = DTR::IsConnected.GetOriginal<decltype(&hkIsConnected)>();
@@ -629,6 +743,21 @@ bool FASTCALL H::hkIsConnected(IEngineClient* thisptr, int edx)
 	return oIsConnected(thisptr, edx);
 }
 
+bool FASTCALL H::hkIsHLTV(IEngineClient* thisptr, int edx)
+{
+	static auto oIsHLTV = DTR::IsHLTV.GetOriginal<decltype(&hkIsHLTV)>();
+
+	static auto uSetupVelocity = MEM::FindPattern(CLIENT_DLL, XorStr("84 C0 75 38 8B 0D ? ? ? ? 8B 01 8B 80"));
+	static const auto uAccumulateLayers = MEM::FindPattern(CLIENT_DLL, XorStr("84 C0 75 0D F6 87"));
+
+	if (reinterpret_cast<std::uintptr_t>(_ReturnAddress()) == uSetupVelocity || reinterpret_cast<std::uintptr_t>(_ReturnAddress()) == uAccumulateLayers)
+		return true;
+
+	return oIsHLTV(thisptr, edx);
+}
+#pragma endregion
+
+#pragma region hooks_netchannel
 bool FASTCALL H::hkSendNetMsg(INetChannel* thisptr, int edx, INetMessage* pMessage, bool bForceReliable, bool bVoice)
 {
 	static auto oSendNetMsg = DTR::SendNetMsg.GetOriginal<decltype(&hkSendNetMsg)>();
@@ -675,91 +804,17 @@ int FASTCALL H::hkSendDatagram(INetChannel* thisptr, int edx, bf_write* pDatagra
 
 	return iReturn;
 }
+#pragma endregion
 
-void FASTCALL H::hkOverrideView(IClientModeShared* thisptr, int edx, CViewSetup* pSetup)
-{
-	static auto oOverrideView = DTR::OverrideView.GetOriginal<decltype(&hkOverrideView)>();
-	
-	if (!I::Engine->IsInGame() || I::Engine->IsTakingScreenshot())
-		return oOverrideView(thisptr, edx, pSetup);
-
-	// get camera origin
-	G::vecCamera = pSetup->vecOrigin;
-
-	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
-
-	if (pLocal == nullptr || !pLocal->IsAlive())
-		return oOverrideView(thisptr, edx, pSetup);
-
-	CBaseCombatWeapon* pWeapon = pLocal->GetWeapon();
-
-	if (pWeapon == nullptr)
-		return oOverrideView(thisptr, edx, pSetup);
-
-	if (CCSWeaponData* pWeaponData = I::WeaponSystem->GetWeaponData(pWeapon->GetItemDefinitionIndex());
-		pWeaponData != nullptr && std::fpclassify(C::Get<float>(Vars.flScreenCameraFOV)) != FP_ZERO &&
-		// check is we not scoped
-		(pWeaponData->nWeaponType == WEAPONTYPE_SNIPER ? !pLocal->IsScoped() : true))
-		// set camera fov
-		pSetup->flFOV += C::Get<float>(Vars.flScreenCameraFOV);
-
-	G::flFov = pSetup->flFOV;	
-
-	oOverrideView(thisptr, edx, pSetup);
-}
-
-void FASTCALL H::hkOverrideMouseInput(IClientModeShared* thisptr, int edx, float* x, float* y)
-{
-	static auto oOverrideMouseInput = DTR::OverrideMouseInput.GetOriginal<decltype(&hkOverrideMouseInput)>();
-	
-	if (!I::Engine->IsInGame())
-		return oOverrideMouseInput(thisptr, edx, x, y);
-	
-	oOverrideMouseInput(thisptr, edx, x, y);
-}
-
-float FASTCALL H::hkGetViewModelFOV(IClientModeShared* thisptr, int edx)
-{
-	static auto oGetViewModelFOV = DTR::GetViewModelFOV.GetOriginal<decltype(&hkGetViewModelFOV)>();
-
-	if (!I::Engine->IsInGame() || I::Engine->IsTakingScreenshot())
-		return oGetViewModelFOV(thisptr, edx);
-
-	if (auto pLocal = CBaseEntity::GetLocalPlayer();
-		pLocal != nullptr && pLocal->IsAlive() && std::fpclassify(C::Get<float>(Vars.flScreenViewModelFOV)) != FP_ZERO)
-		return oGetViewModelFOV(thisptr, edx) + C::Get<float>(Vars.flScreenViewModelFOV);
-
-	return oGetViewModelFOV(thisptr, edx);
-}
-
-int FASTCALL H::hkDoPostScreenEffects(IClientModeShared* thisptr, int edx, CViewSetup* pSetup)
-{
-	static auto oDoPostScreenEffects = DTR::DoPostScreenEffects.GetOriginal<decltype(&hkDoPostScreenEffects)>();
-
-	if (!I::Engine->IsInGame() || I::Engine->IsTakingScreenshot())
-		return oDoPostScreenEffects(thisptr, edx, pSetup);
-
-	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
-
-	if (pLocal != nullptr && I::GlowManager != nullptr && C::Get<bool>(Vars.bEspGlow))
-		CVisuals::Get().Glow(pLocal);
-
-	return oDoPostScreenEffects(thisptr, edx, pSetup);
-}
-
-void FASTCALL H::hkGetLocalViewAngles(void* ecx, void* edx, QAngle& ang)
+#pragma region hooks_prediction
+void FASTCALL H::hkGetLocalViewAngles(IPrediction* thisptr, int edx, QAngle& ang)
 {
 	static auto oGetLocalViewAngles = DTR::GetLocalViewAngles.GetOriginal<decltype(&hkGetLocalViewAngles)>();
-
-	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
-
-	if (pLocal == nullptr)
-		ang.Init();
 
 	if (I::Engine->IsRecordingDemo())
 		I::Engine->GetViewAngles(ang); // pov demo psilent
 	else
-		oGetLocalViewAngles(ecx, edx, ang);
+		oGetLocalViewAngles(thisptr, edx, ang);
 }
 
 void FASTCALL H::hkRunCommand(IPrediction* thisptr, int edx, CBaseEntity* pEntity, CUserCmd* pCmd, IMoveHelper* pMoveHelper)
@@ -773,7 +828,9 @@ void FASTCALL H::hkRunCommand(IPrediction* thisptr, int edx, CBaseEntity* pEntit
 	// get movehelper interface pointer
 	I::MoveHelper = pMoveHelper;
 }
+#pragma endregion
 
+#pragma region hooks_steamgamecoordinator
 int FASTCALL H::hkSendMessage(ISteamGameCoordinator* thisptr, int edx, std::uint32_t uMsgType, const void* pData, std::uint32_t uData)
 {
 	static auto oSendMessage = DTR::SendMessageGC.GetOriginal<decltype(&hkSendMessage)>();
@@ -820,17 +877,109 @@ int FASTCALL H::hkRetrieveMessage(ISteamGameCoordinator* thisptr, int edx, std::
 
 	return iStatus;
 }
+#pragma endregion
 
-bool FASTCALL H::hkSvCheatsGetBool(CConVar* thisptr, int edx)
+#pragma region hooks_csplayer_table
+void FASTCALL H::hkDoExtraBoneProcessing(void* ecx, void* edx, CStudioHdr* hdr, Vector* pos, Quaternion* q, matrix3x4_t* matrix, CBoneBitList& bone_list, CIKContext* context)
 {
-	static auto oSvCheatsGetBool = DTR::SvCheatsGetBool.GetOriginal<decltype(&hkSvCheatsGetBool)>();
-	static std::uintptr_t uCAM_ThinkReturn = MEM::FindPattern(CLIENT_DLL, XorStr("85 C0 75 30 38 86")); // @xref: "Pitch: %6.1f   Yaw: %6.1f   Dist: %6.1f %16s"
+	static auto oDoExtraBoneProcessing = DTR::DoExtraBoneProcessing.GetOriginal<decltype(&hkDoExtraBoneProcessing)>();
 
-	if (reinterpret_cast<std::uintptr_t>(_ReturnAddress()) == uCAM_ThinkReturn && C::Get<int>(Vars.iWorldThirdPersonKey) > 0)
+	CBaseEntity* pEntity = reinterpret_cast<CBaseEntity*>(ecx);
+	if (pEntity == nullptr)
+		return oDoExtraBoneProcessing(ecx, edx, hdr, pos, q, matrix, bone_list, context);
+
+	if (pEntity->IsPlayer() && pEntity->IsAlive())
+	{
+		int* pAnimLayersOwner = reinterpret_cast<int*>(*reinterpret_cast<uintptr_t*>(reinterpret_cast<uintptr_t>(pEntity) + 0x2990) + 0x30);
+		for (int i = 13; i; --i) {
+			if (reinterpret_cast<CBaseEntity*>(pAnimLayersOwner) != pEntity) {
+				*pAnimLayersOwner = reinterpret_cast<uintptr_t>(pEntity);
+			}
+
+			pAnimLayersOwner += 14;
+		}
+	}
+}
+
+void FASTCALL H::hkStandardBlendingRules(void* ecx, void* edx, CStudioHdr* pStudioHdr, Vector pos[], Quaternion q[], float currentTime, int boneMask)
+{
+	static auto oStandardBlendingRules = DTR::StandardBlendingRules.GetOriginal<decltype(&hkStandardBlendingRules)>();
+
+	CBaseEntity* pEntity = reinterpret_cast<CBaseEntity*>(ecx);
+
+	if (pEntity == nullptr || (pEntity->GetIndex() - 1) > 63)
+		return oStandardBlendingRules(ecx, edx, pStudioHdr, pos, q, currentTime, boneMask);
+
+	// disable interpolation.
+	if (!(pEntity->GetEffects() & EF_NOINTERP))
+		pEntity->GetEffects() |= EF_NOINTERP;
+
+	oStandardBlendingRules(ecx, edx, pStudioHdr, pos, q, currentTime, boneMask);
+
+	// restore interpolation.
+	pEntity->GetEffects() &= ~EF_NOINTERP;	
+}
+#pragma endregion
+
+#pragma region hooks_convar
+bool FASTCALL H::hksv_cheatsGetBool(CConVar* thisptr, int edx)
+{
+	static auto osv_cheatsGetBool = DTR::sv_cheatsGetBool.GetOriginal<decltype(&hksv_cheatsGetBool)>();
+	static std::uintptr_t uCAM_ThinkReturn = MEM::FindPattern(CLIENT_DLL, XorStr("85 C0 75 30 38 86")); // @xref: "Pitch: %6.1f   Yaw: %6.1f   Dist: %6.1f %16s"
+	static CConVar* sv_cheats = I::ConVar->FindVar(XorStr("sv_cheats"));
+
+	if (reinterpret_cast<std::uintptr_t>(_ReturnAddress()) == uCAM_ThinkReturn && C::Get<int>(Vars.iWorldThirdPersonKey) > 0 || thisptr == sv_cheats)
 		return true;
 
-	return oSvCheatsGetBool(thisptr, edx);
+	return osv_cheatsGetBool(thisptr, edx);
 }
+
+int FASTCALL H::hkr_3dskyGetInt(CConVar* thisptr, int edx)
+{
+	static auto or_3dskyGetInt = DTR::r_3dskyGetInt.GetOriginal<decltype(&hkr_3dskyGetInt)>();
+	static CConVar* r_3dsky = I::ConVar->FindVar(XorStr("r_3dsky"));
+
+	if (thisptr == r_3dsky && C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_3DSKY))
+		return 0;
+
+	return or_3dskyGetInt(thisptr, edx);
+}
+
+bool FASTCALL H::hkcl_csm_enabledGetBool(CConVar* thisptr, int edx)
+{
+	static auto ocl_csm_enabledGetBool = DTR::cl_csm_enabledGetBool.GetOriginal<decltype(&hkcl_csm_enabledGetBool)>();
+	static CConVar* cl_csm_enabled = I::ConVar->FindVar(XorStr("cl_csm_enabled"));
+
+	if (thisptr == cl_csm_enabled && C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_SHADOWS))
+		return 0;
+
+	return ocl_csm_enabledGetBool(thisptr, edx);
+}
+
+bool FASTCALL H::hkmat_postprocess_enableGetBool(CConVar* thisptr, int edx)
+{
+	static auto omat_postprocess_enableGetBool = DTR::mat_postprocess_enableGetBool.GetOriginal<decltype(&hkmat_postprocess_enableGetBool)>();
+	static CConVar* mat_postprocess_enable = I::ConVar->FindVar(XorStr("mat_postprocess_enable"));
+
+	if (thisptr == mat_postprocess_enable && C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_POSTPROCESSING))
+		return 0;
+
+	return omat_postprocess_enableGetBool(thisptr, edx);
+}
+
+int FASTCALL H::hkweapon_debug_spread_showGetInt(CConVar* thisptr, int edx)
+{
+	static auto oweapon_debug_spread_showGetInt = DTR::weapon_debug_spread_showGetInt.GetOriginal<decltype(&hkweapon_debug_spread_showGetInt)>();
+	static CConVar* weapon_debug_spread_show = I::ConVar->FindVar(XorStr("weapon_debug_spread_show"));
+
+	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
+
+	if (thisptr == weapon_debug_spread_show && C::Get<bool>(Vars.bScreenSniperCrosshair) && pLocal->IsAlive() && !pLocal->IsScoped())
+		return 3;
+
+	return oweapon_debug_spread_showGetInt(thisptr, edx);
+}
+#pragma endregion
 
 long CALLBACK H::hkWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -910,7 +1059,6 @@ void P::Sequence(const CRecvProxyData* pData, void* pStruct, void* pOut)
 	static auto oSequence = RVP::Sequence->GetOriginal();
 
 	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
-
 	if (pLocal == nullptr || !pLocal->IsAlive())
 		return oSequence(pData, pStruct, pOut);
 

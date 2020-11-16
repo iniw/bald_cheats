@@ -10,6 +10,8 @@
 #include "../utilities/logging.h"
 // used: _bstr_t
 #include <comdef.h>
+// used: random int
+#include "../utilities/math.h"
 
 void CSkinChanger::Run(CBaseEntity* pLocal)
 {
@@ -21,10 +23,6 @@ void CSkinChanger::Run(CBaseEntity* pLocal)
 	if (pViewmodelWeapon == nullptr)
 		return;
 
-	CBaseWeaponWorldModel* pViewmodelWorld = I::ClientEntityList->GetFromHandle<CBaseWeaponWorldModel>(pViewmodelWeapon->GetWorldModelHandle());
-	if (pViewmodelWorld == nullptr)
-		return;
-
 	Weapons(pLocal);
 	Gloves(pLocal);
 
@@ -34,8 +32,6 @@ void CSkinChanger::Run(CBaseEntity* pLocal)
 		return;	
 	
 	pViewmodel->GetModelIndex() = I::ModelInfo->GetModelIndex(mapItemList[nActiveDefinitionIndex].szModel);
-	pViewmodelWorld->GetModelIndex() = I::ModelInfo->GetModelIndex(mapItemList[nActiveDefinitionIndex].szModel) + 1;
-	//pWorldModel->GetModelIndex() = I::ModelInfo->GetModelIndex(mapItemList[nActiveDefinitionIndex].szModel);
 }
 
 void CSkinChanger::Weapons(CBaseEntity* pLocal)
@@ -47,7 +43,7 @@ void CSkinChanger::Weapons(CBaseEntity* pLocal)
 	if (!I::Engine->GetPlayerInfo(I::Engine->GetLocalPlayer(), &pInfo))
 		return;
 
-	if (const auto hWeapons = pLocal->GetWeaponsHandle(); hWeapons != nullptr)
+	if (const CBaseHandle* hWeapons = pLocal->GetWeaponsHandle(); hWeapons != nullptr)
 	{
 		for (std::size_t i = 0U; hWeapons[i] != INVALID_EHANDLE_INDEX; i++)
 		{
@@ -69,6 +65,10 @@ void CSkinChanger::Weapons(CBaseEntity* pLocal)
 
 void CSkinChanger::Gloves(CBaseEntity* pLocal)
 {
+	SkinchangerVariables_t WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[GLOVE_T];
+	if (!WeaponVars.bEnabled)
+		return;
+
 	CBaseHandle* hWereables = pLocal->GetWearablesHandle();
 	
 	static CBaseHandle hDefaultGlove = CBaseHandle(0);
@@ -119,8 +119,6 @@ void CSkinChanger::Gloves(CBaseEntity* pLocal)
 
 	pGlove->GetGloveIndex() = -1;
 	pGlove->GetItemIDHigh() = -1;
-
-	SkinchangerVariables_t WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[GLOVE_T];
 
 	Apply(pGlove, WeaponVars, pInfo.nXuidLow);
 
@@ -219,44 +217,34 @@ void CSkinChanger::Event(IGameEvent* pEvent, const FNV1A_t uNameHash)
 void CSkinChanger::Dump()
 {
 	const static std::uintptr_t uSigAddress = MEM::FindPattern(CLIENT_DLL, XorStr("E8 ? ? ? ? FF 76 0C 8D 48 04 E8"));
-
 	const int32_t iItemSystemOffset = *reinterpret_cast<std::int32_t*>(uSigAddress + 1);
-
 	const auto pItemSystemFn = reinterpret_cast<CCStrike15ItemSystem * (*)()>(uSigAddress + 5 + iItemSystemOffset);
-
 	const CCStrike15ItemSchema* pItemSchema = reinterpret_cast<CCStrike15ItemSchema*>(std::uintptr_t(pItemSystemFn()) + sizeof(void*));
+	const std::int32_t iPaintKitDefinitionOffset = *reinterpret_cast<std::int32_t*>(uSigAddress + 11 + 1);
+	const auto pGetPaintKitDefinitionFn = reinterpret_cast<CPaintKit * (__thiscall*)(CCStrike15ItemSchema*, int)>(uSigAddress + 11 + 5 + iPaintKitDefinitionOffset);
+	const std::intptr_t pStartElementOffset = *reinterpret_cast<std::intptr_t*>(std::uintptr_t(pGetPaintKitDefinitionFn) + 8 + 2);
+	const int iHeadOffset = pStartElementOffset - 12;
+	const auto mapHead = reinterpret_cast<Head_t<int, CPaintKit*>*>(std::uintptr_t(pItemSchema) + iHeadOffset);
 
+	for (auto i = 0; i < mapHead->last_element; ++i)
 	{
-		const std::int32_t iPaintKitDefinitionOffset = *reinterpret_cast<std::int32_t*>(uSigAddress + 11 + 1);
+		const auto pPaintKit = mapHead->memory[i].value;
 
-		const auto pGetPaintKitDefinitionFn = reinterpret_cast<CPaintKit * (__thiscall*)(CCStrike15ItemSchema*, int)>(uSigAddress + 11 + 5 + iPaintKitDefinitionOffset);
+		if (pPaintKit->id == 9001)
+			continue;
 
-		const std::intptr_t pStartElementOffset = *reinterpret_cast<std::intptr_t*>(std::uintptr_t(pGetPaintKitDefinitionFn) + 8 + 2);
+		const wchar_t* wszName = I::Localize->Find(pPaintKit->item_name.buffer + 1);
+		const _bstr_t bstrName(wszName);
+		const std::string szName(bstrName);	
 
-		const int iHeadOffset = pStartElementOffset - 12;
-
-		const auto mapHead = reinterpret_cast<Head_t<int, CPaintKit*>*>(std::uintptr_t(pItemSchema) + iHeadOffset);
-
-		for (auto i = 0; i < mapHead->last_element; ++i)
-		{
-			const auto pPaintKit = mapHead->memory[i].value;
-
-			if (pPaintKit->id == 9001)
-				continue;
-
-			const wchar_t* wszName = I::Localize->Find(pPaintKit->item_name.buffer + 1);
-			const _bstr_t bstrName(wszName);
-			const std::string szName(bstrName);	
-
-			if (pPaintKit->id < 10000)
-				vecSkinKits.push_back({ pPaintKit->id, pPaintKit->id != 0 ? fmt::format("{} - {:d}", szName, pPaintKit->id) : szName });
-			else
-				vecGloveKits.push_back({ pPaintKit->id, pPaintKit->id != 0 ? fmt::format("{} - {:d}", szName, pPaintKit->id) : szName });
-		}
-
-		std::sort(vecSkinKits.begin(), vecSkinKits.end());
-		std::sort(vecGloveKits.begin(), vecGloveKits.end());
+		if (pPaintKit->id < 10000)
+			vecSkinKits.push_back({ pPaintKit->id, pPaintKit->id != 0 ? fmt::format("{} - {:d}", szName, pPaintKit->id) : szName });
+		else
+			vecGloveKits.push_back({ pPaintKit->id, pPaintKit->id != 0 ? fmt::format("{} - {:d}", szName, pPaintKit->id) : szName });
 	}
+
+	std::sort(vecSkinKits.begin(), vecSkinKits.end());
+	std::sort(vecGloveKits.begin(), vecGloveKits.end());
 
 	for (size_t i = 0; i < vecSkinKits.size(); i++)
 		std::transform(vecSkinKits[i].szName.begin(), vecSkinKits[i].szName.end(), vecSkinKits[i].szName.begin(), ::tolower);
@@ -267,21 +255,19 @@ void CSkinChanger::Dump()
 
 int CSkinChanger::GetCorrectSequence(const short nDefinitionIndex, const int iSequence, CBaseEntity* pViewmodelOwner)
 {
-	if (nDefinitionIndex == WEAPON_KNIFE_BUTTERFLY
+	if ((nDefinitionIndex == WEAPON_KNIFE_BUTTERFLY
 		|| nDefinitionIndex == WEAPON_KNIFE_FALCHION
 		|| nDefinitionIndex == WEAPON_KNIFE_SURVIVAL_BOWIE
 		|| nDefinitionIndex == WEAPON_KNIFE_PUSH
 		|| nDefinitionIndex == WEAPON_KNIFE_OUTDOOR)
+		&& (iSequence == SEQUENCE_DEFAULT_IDLE1 || iSequence == SEQUENCE_DEFAULT_IDLE2))
 	{
-		if (iSequence == SEQUENCE_DEFAULT_IDLE1 || iSequence == SEQUENCE_DEFAULT_IDLE2)
-		{
-			pViewmodelOwner->GetCycle() = 0.999f;
-			pViewmodelOwner->InvalidatePhysicsRecursive(ANIMATION_CHANGED);
-		}
+		pViewmodelOwner->GetCycle() = 0.999f;
+		pViewmodelOwner->InvalidatePhysicsRecursive(ANIMATION_CHANGED);
 	}
 
-	std::random_device rd;
-	std::mt19937 gen(rd());
+	static std::random_device rd;
+	static std::mt19937 gen(rd());
 	std::uniform_int_distribution<> distrib(1, 10);
 
 	switch (nDefinitionIndex)
@@ -298,7 +284,7 @@ int CSkinChanger::GetCorrectSequence(const short nDefinitionIndex, const int iSe
 				return SEQUENCE_BUTTERFLY_DRAW;
 		}
 		case SEQUENCE_DEFAULT_LOOKAT01:
-			return RandomInt(SEQUENCE_BUTTERFLY_LOOKAT01, SEQUENCE_BUTTERFLY_LOOKAT03);
+			return M::RandomInt(SEQUENCE_BUTTERFLY_LOOKAT01, SEQUENCE_BUTTERFLY_LOOKAT03);
 		default:
 			return iSequence + 1;
 		}
@@ -310,9 +296,9 @@ int CSkinChanger::GetCorrectSequence(const short nDefinitionIndex, const int iSe
 		case SEQUENCE_DEFAULT_IDLE2:
 			return SEQUENCE_FALCHION_IDLE1;
 		case SEQUENCE_DEFAULT_HEAVY_MISS1:
-			return RandomInt(SEQUENCE_FALCHION_HEAVY_MISS1, SEQUENCE_FALCHION_HEAVY_MISS1_NOFLIP);
+			return M::RandomInt(SEQUENCE_FALCHION_HEAVY_MISS1, SEQUENCE_FALCHION_HEAVY_MISS1_NOFLIP);
 		case SEQUENCE_DEFAULT_LOOKAT01:
-			return RandomInt(SEQUENCE_FALCHION_LOOKAT01, SEQUENCE_FALCHION_LOOKAT02);
+			return M::RandomInt(SEQUENCE_FALCHION_LOOKAT01, SEQUENCE_FALCHION_LOOKAT02);
 		case SEQUENCE_DEFAULT_DRAW:
 		case SEQUENCE_DEFAULT_IDLE1:
 			return iSequence;
@@ -325,7 +311,7 @@ int CSkinChanger::GetCorrectSequence(const short nDefinitionIndex, const int iSe
 		switch (iSequence)
 		{
 		case SEQUENCE_DEFAULT_LOOKAT01:
-			return RandomInt(SEQUENCE_CSS_LOOKAT01, SEQUENCE_CSS_LOOKAT02);
+			return M::RandomInt(SEQUENCE_CSS_LOOKAT01, SEQUENCE_CSS_LOOKAT02);
 		default:
 			return iSequence;
 		}
@@ -339,10 +325,10 @@ int CSkinChanger::GetCorrectSequence(const short nDefinitionIndex, const int iSe
 		case SEQUENCE_DEFAULT_LIGHT_MISS1:
 		case SEQUENCE_DEFAULT_LIGHT_MISS2:
 		{
-			return RandomInt(SEQUENCE_DAGGERS_LIGHT_MISS1, SEQUENCE_DAGGERS_LIGHT_MISS5);
+			return M::RandomInt(SEQUENCE_DAGGERS_LIGHT_MISS1, SEQUENCE_DAGGERS_LIGHT_MISS5);
 		}
 		case SEQUENCE_DEFAULT_HEAVY_MISS1:
-			return RandomInt(SEQUENCE_DAGGERS_HEAVY_MISS2, SEQUENCE_DAGGERS_HEAVY_MISS1);
+			return M::RandomInt(SEQUENCE_DAGGERS_HEAVY_MISS2, SEQUENCE_DAGGERS_HEAVY_MISS1);
 		case SEQUENCE_DEFAULT_HEAVY_HIT1:
 		case SEQUENCE_DEFAULT_HEAVY_BACKSTAB:
 		case SEQUENCE_DEFAULT_LOOKAT01:
@@ -376,9 +362,9 @@ int CSkinChanger::GetCorrectSequence(const short nDefinitionIndex, const int iSe
 		switch (iSequence)
 		{
 		case SEQUENCE_DEFAULT_DRAW:
-			return RandomInt(SEQUENCE_BUTTERFLY_DRAW, SEQUENCE_BUTTERFLY_DRAW2);
+			return M::RandomInt(SEQUENCE_BUTTERFLY_DRAW, SEQUENCE_BUTTERFLY_DRAW2);
 		case SEQUENCE_DEFAULT_LOOKAT01:
-			return RandomInt(SEQUENCE_BUTTERFLY_LOOKAT01, 14);
+			return M::RandomInt(SEQUENCE_BUTTERFLY_LOOKAT01, 14);
 		default:
 			return iSequence + 1;
 		}
@@ -388,7 +374,7 @@ int CSkinChanger::GetCorrectSequence(const short nDefinitionIndex, const int iSe
 		switch (iSequence)
 		{
 		case SEQUENCE_DEFAULT_LOOKAT01:
-			return RandomInt(12, 13);
+			return M::RandomInt(12, 13);
 		default:
 			return iSequence;
 		}
@@ -398,7 +384,7 @@ int CSkinChanger::GetCorrectSequence(const short nDefinitionIndex, const int iSe
 		switch (iSequence)
 		{
 		case SEQUENCE_DEFAULT_LOOKAT01:
-			return RandomInt(14, 15);
+			return M::RandomInt(14, 15);
 		default:
 			return iSequence;
 		}
@@ -425,4 +411,6 @@ bool CSkinChanger::FixSequences(CRecvProxyData* pData, CBaseViewModel* pViewmode
 
 	long& iSequence = pData->Value.Int;
 	iSequence = GetCorrectSequence(nDefinitionIndex, iSequence, pViewmodelOwner);
+
+	return true;
 }

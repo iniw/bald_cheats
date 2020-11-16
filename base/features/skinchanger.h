@@ -30,11 +30,6 @@ public:
 	std::vector<GD::PaintKit_t> vecSkinKits;
 	std::vector<GD::PaintKit_t> vecGloveKits;
 private:
-	/* random int generator */
-	inline int RandomInt(int iMin, int iMax)
-	{
-		return rand() % (iMax - iMin + 1) + iMin;
-	}
 	/* fixes knife sequences */
 	int GetCorrectSequence(const short nDefinitionIndex, const int iSequence, CBaseEntity* pOwner);
 	/* creates glove entity */

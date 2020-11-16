@@ -88,6 +88,9 @@ void CAutoWall::ClipTraceToPlayers(const Vector& vecAbsStart, const Vector& vecA
 
 	for (int i = 1; i <= I::Globals->nMaxClients; i++)
 	{
+		if (i == I::Engine->GetLocalPlayer())
+			continue;
+
 		CBaseEntity* pEntity = I::ClientEntityList->Get<CBaseEntity>(i);
 
 		if (pEntity == nullptr || !pEntity->IsAlive() || pEntity->IsDormant())

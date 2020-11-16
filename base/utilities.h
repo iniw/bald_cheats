@@ -47,6 +47,12 @@ private:
  */
 namespace U
 {
+	struct HudWeapons_t {
+		std::int32_t* GetWeaponCount() {
+			return reinterpret_cast<std::int32_t*>(std::uintptr_t(this) + 0x80);
+		}
+	};
+
 	// Get
 	/* returns class of hud element with given name */
 	template <class C>
@@ -65,6 +71,8 @@ namespace U
 	void SendClanTag(const char* szClanTag, const char* szIdentifier);
 	/* load specified model before you will be in-game */
 	bool PrecacheModel(const char* szModelName);
+	/* loads the skybox with that name */
+	void LoadSkybox(const char* szSkyName);
 	/* allocate client dll data for the object */
 	IClientNetworkable* CreateDLLEntity(int iEntity, EClassIndex nClassID, int nSerial);
 	/* returns icon of given index for custom font */

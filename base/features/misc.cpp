@@ -26,8 +26,8 @@ void CMiscellaneous::Run(CUserCmd* pCmd, CBaseEntity* pLocal, bool& bSendPacket)
 	if (C::Get<bool>(Vars.bMiscBunnyHop))
 		BunnyHop(pCmd, pLocal);
 
-	if (C::Get<int>(Vars.iMiscBlockBotKey) && IPT::IsKeyDown(C::Get<int>(Vars.iMiscBlockBotKey)))
-		CMiscellaneous::Get().BlockBot(pCmd, pLocal);
+	//if (C::Get<int>(Vars.iMiscBlockBotKey) && IPT::IsKeyDown(C::Get<int>(Vars.iMiscBlockBotKey)))
+	//	CMiscellaneous::Get().BlockBot(pCmd, pLocal);
 
 	if (C::Get<bool>(Vars.bMiscRevealRanks) && pCmd->iButtons & IN_SCORE)
 		I::Client->DispatchUserMessage(CS_UM_ServerRankRevealAll, 0U, 0, nullptr);
@@ -211,9 +211,6 @@ void CMiscellaneous::BunnyHop(CUserCmd* pCmd, CBaseEntity* pLocal)
 
 void CMiscellaneous::BlockBot(CUserCmd* pCmd, CBaseEntity* pLocal)
 {
-	if (pCmd->flSideMove != 0 || pCmd->flForwardMove != 0)
-		return;
-
 	// entity we are going to blockbot
 	CBaseEntity* pTarget = nullptr;
 
@@ -260,9 +257,7 @@ void CMiscellaneous::BlockBot(CUserCmd* pCmd, CBaseEntity* pLocal)
 	angAngle.y -= pCmd->angViewPoint.y;
 	angAngle.Normalize();
 
-	pCmd->flSideMove = angAngle.y > 0.1f ? -cl_sidespeed->GetFloat() : cl_sidespeed->GetFloat();
-
-	MovementCorrection(pCmd, pLocal, QAngle(0, -90, 0));
+	pCmd->flSideMove = angAngle.y > 0.f ? -cl_sidespeed->GetFloat() : cl_sidespeed->GetFloat();
 }
 
 void CMiscellaneous::JumpBug(CUserCmd* pCmd, int iPreFlags, int iPostFlags)

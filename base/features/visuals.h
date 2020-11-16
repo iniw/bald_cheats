@@ -27,6 +27,35 @@ struct HitMarkerObject_t
 	float	flTime;
 };
 
+static const char* arrVisualsSkyboxes[] =
+{
+	"default",
+	"cs_baggage_skybox",
+	"cs_tibet",
+	"embassy",
+	"italy",
+	"jungle",
+	"nukeblank",
+	"office",
+	"sky_cs15_daylight01_hdr",
+	"sky_cs15_daylight02_hdr",
+	"sky_cs15_daylight03_hdr",
+	"sky_cs15_daylight04_hdr",
+	"sky_csgo_cloudy01",
+	"sky_csgo_night_flat",
+	"sky_csgo_night02",
+	"sky_day02_05_hdr",
+	"sky_day02_05",
+	"sky_dust",
+	"sky_l4d_rural02_ldr",
+	"sky_venice",
+	"vertigo_hdr",
+	"vertigo",
+	"vertigoblue_hdr",
+	"vietnam",
+	"sky_lunacy"
+};
+
 class CEnvTonemapController;
 class CVisuals : public CSingleton<CVisuals>
 {
@@ -51,16 +80,16 @@ public:
 		 */
 		m_arrMaterials =
 		{
-			std::make_pair(CreateMaterial(XorStr("qo0_players"), XorStr("VertexLitGeneric")),
-			CreateMaterial(XorStr("qo0_players_flat"), XorStr("UnlitGeneric"))),
+			std::make_pair(CreateMaterial(XorStr("bald_players"), XorStr("VertexLitGeneric")),
+			CreateMaterial(XorStr("bald_players_flat"), XorStr("UnlitGeneric"))),
 
-			std::make_pair(CreateMaterial(XorStr("qo0_viewmodel"), XorStr("VertexLitGeneric")),
-			CreateMaterial(XorStr("qo0_viewmodel_flat"), XorStr("UnlitGeneric"))),
+			std::make_pair(CreateMaterial(XorStr("bald_viewmodel"), XorStr("VertexLitGeneric")),
+			CreateMaterial(XorStr("bald_viewmodel_flat"), XorStr("UnlitGeneric"))),
 
-			std::make_pair(CreateMaterial(XorStr("qo0_reflective"), XorStr("VertexLitGeneric"), XorStr("vgui/white"), XorStr("env_cubemap")),
-			CreateMaterial(XorStr("qo0_glow"), XorStr("VertexLitGeneric"), XorStr("vgui/white"), XorStr("models/effects/cube_white"))),
+			std::make_pair(CreateMaterial(XorStr("bald_reflective"), XorStr("VertexLitGeneric"), XorStr("vgui/white"), XorStr("env_cubemap")),
+			CreateMaterial(XorStr("bald_glow"), XorStr("VertexLitGeneric"), XorStr("vgui/white"), XorStr("models/effects/cube_white"))),
 
-			std::make_pair(CreateMaterial(XorStr("qo0_scroll"), XorStr("VertexLitGeneric"), XorStr("dev/screenhighlight_pulse"), "", false, false, szScrollProxies),
+			std::make_pair(CreateMaterial(XorStr("bald_scroll"), XorStr("VertexLitGeneric"), XorStr("dev/screenhighlight_pulse"), "", false, false, szScrollProxies),
 			I::MaterialSystem->FindMaterial(XorStr("models/inventory_items/hydra_crystal/hydra_crystal_detail"), TEXTURE_GROUP_OTHER))
 		};
 
@@ -84,10 +113,12 @@ public:
 	bool Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const DrawModelInfo_t& info, matrix3x4_t* pBoneToWorld, float* flFlexWeights, float* flFlexDelayedWeights, const Vector& vecModelOrigin, int nFlags);
 	/* glow effect on entities like while spectating */
 	void Glow(CBaseEntity* pLocal);
-	/* removes several particles, textures and props */
-	void Removals();
 	/* modulates materials and changes the skybox to make it look like night */
 	void NightMode();
+	/* changes the skybox */
+	void SkyChanger(EClientFrameStage stage);
+	/* removes a few particles n stuff for "better" fps */
+	void Removals();
 
 	/* saved hitmarker info's */
 	std::deque<HitMarkerObject_t> m_deqHitMarkers = { };
@@ -153,6 +184,8 @@ private:
 	void FlashBar(CBaseEntity* pEntity, Context_t& ctx, const Color& colPrimary, const Color& colBackground, const Color& colOutline);
 	/* draw lines on some of the entitie's bones */
 	void Skeleton(CBaseEntity* pEntity);
+	/* draws dots on the head of every record for that entity */
+	void VisualizeBacktrack(int iEntityIndex);
 
 	/* chams materials */
 	std::array<std::pair<IMaterial*, IMaterial*>, 4U> m_arrMaterials = { };

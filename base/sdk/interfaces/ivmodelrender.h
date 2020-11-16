@@ -52,6 +52,22 @@ struct DrawModelState_t
 	int						iLOD;
 };
 
+class CStudioHdr {
+public:
+	class mstudioposeparamdesc_t {
+	public:
+		int					sznameindex;
+		__forceinline char* const name(void) const { return ((char*)this) + sznameindex; }
+		int					flags;	// ????
+		float				start;	// starting value
+		float				end;	// ending value
+		float				loop;	// 
+	};
+
+	studiohdr_t* m_pStudioHdr;
+	void* m_pVModel;
+};
+
 class IVModelRender
 {
 public:

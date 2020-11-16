@@ -46,9 +46,6 @@ struct SequenceObject_t
 class CLagCompensation : public CSingleton<CLagCompensation>
 {
 public:
-	// Get
-	void Run(CUserCmd* pCmd);
-
 	// Main
 	void UpdateIncomingSequences(INetChannel* pNetChannel);
 	void ClearIncomingSequences();
@@ -66,12 +63,21 @@ private:
 struct Record_t
 {
 	float flSimtime;
-	Vector vecHitboxPos;
 	Vector vecHeadPos;
 	Vector vecOrigin;
 	Vector vecAbsOrigin;
-	studiohdr_t* pModel;
-	std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix;
+	studiohdr_t* pStudioModel;
+	std::array<matrix3x4_t, MAXSTUDIOBONES> arrBoneMatrixes;
+
+	Record_t()
+	{
+		flSimtime = 0.f;
+		vecHeadPos.Init();
+		vecOrigin.Init();
+		vecAbsOrigin.Init();
+		pStudioModel = nullptr;
+		arrBoneMatrixes.fill({ });
+	}
 };
 
 struct OriginalData_t
@@ -85,32 +91,31 @@ class CBacktracking : public CSingleton<CBacktracking>
 {
 public:
 	//Get
-	void Run(CUserCmd* pCmd, CBaseEntity* pLocal);
+	void  Run(CUserCmd* pCmd, CBaseEntity* pLocal);
 	/* fills the records array and deque */
-	void Update(CBaseEntity* pLocal);
-	/* returns the deque that belongs to the index */
-	std::deque<Record_t> GetPlayerRecord(int iIndex);
+	void  Update(CBaseEntity* pLocal);
 	/* applies the stored data */
-	void ApplyData(Record_t record, CBaseEntity* pEntity);
+	void  ApplyData(Record_t record, CBaseEntity* pEntity);
 	/* restores the original data */
-	void RestoreData(CBaseEntity* pEntity);
+	void  RestoreData(CBaseEntity* pEntity);
 	/* amount of lerp on the client */
 	float GetLerp();
 	/* returns true if the simtime is viable for lagcompensation */
-	bool IsValid(float flSimtime);
+	bool  IsValid(float flSimtime);
 	/* draw a pill hitbox on the record */
-	void DrawHitbox(std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix, studiohdr_t* pModel);
+	void  DrawHitbox(std::array<matrix3x4_t, MAXSTUDIOBONES> arrMatrix, studiohdr_t* pStudioModel);
+	/* returns the deque that belongs to that index */
+	void  GetValidRecords(int iIndex, std::deque<Record_t>& deqRecords);
+	/* used to draw stuff for debugging pourposes */
+	void Draw();
+
 private:
-	/* returns true if an entity is a valid backtrack target */
-	bool IsValid(CBaseEntity* pLocal, CBaseEntity* pEntity);
-	/* returns the best hitbox position */
-	Vector GetBestHitbox(CBaseEntity* pLocal, CBaseEntity* pEntity, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix);
 	/* returns the closest entity */
 	CBaseEntity* GetBestEntity(CBaseEntity* pLocal);
 	/* returns the best record for the entity at that index */
-	Record_t GetBestRecord(CBaseEntity* pLocal, int iIndex);
+	Record_t	 GetBestRecord(CBaseEntity* pLocal, int iIndex);
 	/* returns the total amount of latency */
-	float	GetLatency(bool bOutgoing, bool bIncoming);
+	float		 GetLatency(bool bOutgoing, bool bIncoming);
 
 	/* member variables */
 	OriginalData_t m_orgData; // original data of the entity we're backtracking 

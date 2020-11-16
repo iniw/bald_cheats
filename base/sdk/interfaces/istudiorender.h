@@ -41,7 +41,7 @@ struct DrawModelResults_t;
 struct ColorMeshInfo_t;
 struct StudioDecalHandle_t { int iUnused; };
 struct DrawModelInfo_t
-{
+{	
 	studiohdr_t*			pStudioHdr;
 	studiohwdata_t*			pHardwareData;
 	StudioDecalHandle_t		hDecals;

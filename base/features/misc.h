@@ -26,7 +26,7 @@ public:
 	void AutoPistol(CUserCmd* pCmd, CBaseEntity* pLocal);
 	/* fuck u dalves */
 	void AutoQueue();
-	/* blocks the enemy closest to you */
+	/* blocks the entity closest to you */
 	void BlockBot(CUserCmd* pCmd, CBaseEntity* pLocal);
 private:
 	// Movement

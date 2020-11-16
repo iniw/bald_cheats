@@ -1,11 +1,17 @@
 #include "draw.h"
 
+// used: wstring to string
+#include <codecvt>
+#include <locale>
+
 // used: engine interface
 #include "../core/interfaces.h"
 // used: current window
 #include "inputsystem.h"
 // used: rounding numbers
 #include <cmath>
+// used: AsciiUnicode
+#include "../utilities.h"
 
 /* font resources */
 #include "../../resources/whitney.h"
@@ -13,6 +19,7 @@
 #include "../../resources/qo0icons.h"
 #include "../../resources/roboto_medium.h"
 #include "../../resources/segoe_ui.h"
+
 
 
 #pragma region imgui_extended
@@ -289,12 +296,7 @@ bool ImGui::ColorCheckbox(const char* szLabel, bool* v, Color* col)
 	ImGui::Checkbox("", v);
 	ImGui::SameLine(0.0f, 5.0f);
 
-	ImVec4 vecColor = ImVec4{ col->rBase(), col->gBase(), col->bBase(), col->aBase() };
-
-	if (ImGui::ColorEdit4(szLabel, &vecColor.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview | ImGuiColorEditFlags_NoTooltip))
-	{
-		*col = Color(vecColor.x, vecColor.y, vecColor.z, vecColor.w);
-	}
+	ImGui::ColorEdit3(szLabel, col, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview | ImGuiColorEditFlags_NoTooltip);
 
 	ImGui::PopID();
 
@@ -497,7 +499,7 @@ void D::Setup(IDirect3DDevice9* pDevice, unsigned int uFontFlags)
 	F::Icons = io.Fonts->AddFontFromMemoryCompressedTTF(qo0icons_compressed_data, qo0icons_compressed_size, 12.f, &imIconsConfig, wIconRanges);
 
 	ImFontConfig imSegoeUIConfig;
-	imSegoeUIConfig.RasterizerFlags = ImGuiFreeType::ForceAutoHint;
+	imSegoeUIConfig.RasterizerFlags = ImGuiFreeType::MonoHinting;
 	F::SegoeUI = io.Fonts->AddFontFromMemoryCompressedTTF(segoe_ui_compressed_data, segoe_ui_compressed_size, 12.f, &imSegoeUIConfig, io.Fonts->GetGlyphRangesCyrillic());
 
 	ImFontConfig imSegoeUI40Config;
@@ -510,6 +512,7 @@ void D::Setup(IDirect3DDevice9* pDevice, unsigned int uFontFlags)
 
 	ImFontConfig imTahomaConfig;
 	imTahomaConfig.RasterizerFlags = ImGuiFreeType::ForceAutoHint;
+	imTahomaConfig.RasterizerMultiply = 1.5f;
 	F::Tahoma = io.Fonts->AddFontFromFileTTF(XorStr("C:\\Windows\\Fonts\\tahoma.ttf"), 9.f, &imTahomaConfig, io.Fonts->GetGlyphRangesCyrillic());
 
 	if (ImGuiFreeType::BuildFontAtlas(io.Fonts, uFontFlags))

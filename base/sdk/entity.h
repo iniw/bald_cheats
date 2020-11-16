@@ -348,7 +348,8 @@ struct VarMapping_t
 	float m_lastInterpolationTime;
 };
 
-
+class CBoneBitList;
+class CIKContext;
 
 class IClientEntity : public IClientUnknown, public IClientRenderable, public IClientNetworkable, public IClientThinkable
 {
@@ -457,6 +458,13 @@ public:
 	N_ADD_VARIABLE(float, GetLowerBodyYaw, "CCSPlayer->m_flLowerBodyYawTarget");
 	N_ADD_VARIABLE(int, GetSurvivalTeam, "CCSPlayer->m_nSurvivalTeam");
 	N_ADD_VARIABLE_OFFSET(int, IsUsedNewAnimState, "CCSPlayer->m_flLastExoJumpTime", 0x8);
+	N_ADD_OFFSET(int, OcclusionFlags, 0xA28);
+	N_ADD_OFFSET(int, OcclusionFrameCount, 0xA30);
+	N_ADD_OFFSET(int, LastSetupBonesFrame, 0xA68);
+	N_ADD_OFFSET(int, WriteableBones, 0x26AC);
+	N_ADD_OFFSET(int, ReadableBones, 0x26B0);
+	N_ADD_OFFSET(CUtlVector<matrix3x4_t>, GetBoneCache, 0x2910);
+	N_ADD_OFFSET(int, BoneCount, 0x291C);
 	#pragma endregion
 
 	#pragma region DT_BaseEntity
@@ -515,6 +523,35 @@ public:
 	VarMapping_t* VarMapping()
 	{
 		return reinterpret_cast<VarMapping_t*>((DWORD)this + 0x24);
+	}
+
+	bool SetupBonesFixed(std::array<matrix3x4_t, MAXSTUDIOBONES>& arrBones, int fBoneMask, float flCurTime)
+	{
+		const int iBackupOcclusionFlags = this->OcclusionFlags();
+		const int iBackupOcclusionFrameCount = this->OcclusionFrameCount();
+		const int iBackupLastSetupBonesFrame = this->LastSetupBonesFrame();
+		
+		this->GetEffects() |= EF_NOINTERP;
+
+		this->SetAbsOrigin(this->GetOrigin());
+
+		this->OcclusionFlags() = this->OcclusionFrameCount() = this->LastSetupBonesFrame() = 0;
+
+		this->ReadableBones() = this->WriteableBones() = 0;
+
+		this->InvalidateBoneCache();
+
+		bool result = this->SetupBones(arrBones.data(), MAXSTUDIOBONES, fBoneMask, flCurTime);
+
+		this->OcclusionFlags() = iBackupOcclusionFlags;
+
+		this->OcclusionFrameCount() = iBackupOcclusionFrameCount;
+
+		this->LastSetupBonesFrame() = iBackupLastSetupBonesFrame;
+
+		this->GetEffects() &= ~EF_NOINTERP;
+
+		return result;
 	}
 
 	[[nodiscard]] CAnimationLayer* GetAnimationOverlays()
@@ -614,33 +651,6 @@ public:
 		MEM::CallVFunc<void>(this, 223);
 	}
 
-	bool SetupBonesFixed(std::array<matrix3x4_t, MAXSTUDIOBONES> arrBones, float flCurrentTime)
-	{
-		this->SetAbsOrigin(this->GetOrigin());
-
-		int iBackup1 = *(int*)((uintptr_t)this + 0xA68);
-		int iBackup2 = *(int*)((uintptr_t)this + 0xA30);
-
-		*(int*)((uintptr_t)this + 0xA68) = 0;
-		*(int*)((uintptr_t)this + 0xA30) = 0;
-
-		this->GetEffects() |= EF_NOINTERP;
-
-		this->UpdateClientSideAnimations();
-
-		this->InvalidateBoneCache();
-
-		if (!this->SetupBones(arrBones.data(), MAXSTUDIOBONES, BONE_USED_BY_ANYTHING, flCurrentTime))
-			return false;
-
-		this->GetEffects() &= ~EF_NOINTERP;
-
-		*(int*)((uintptr_t)this + 0xA68) = iBackup1;
-		*(int*)((uintptr_t)this + 0xA30) = iBackup2;
-
-		return true;
-	}
-
 	void PreThink()
 	{
 		MEM::CallVFunc<void>(this, 317);
@@ -659,7 +669,6 @@ public:
 		return oPhysicsRunThink(this, nThinkMethod);
 	}
 
-
 	void InvalidatePhysicsRecursive(EInvalidatePhysicsBits bits)
 	{
 		using InvalidatePhysicsRecursive_t = void(__thiscall*)(decltype(this), EInvalidatePhysicsBits);
@@ -667,17 +676,28 @@ public:
 		oInvalidatePhysicsRecursive(this, bits);
 	}
 
+	void InvalidateBoneCache()
+	{
+		static DWORD addr = (DWORD)MEM::FindPattern(CLIENT_DLL, XorStr("80 3D ? ? ? ? ? 74 16 A1 ? ? ? ? 48 C7 81"));
+
+		unsigned long g_iModelBoneCounter = **(unsigned long**)(addr + 10);
+		*(unsigned int*)((DWORD)this + 0x2924) = 0xFF7FFFFF; // m_flLastBoneSetupTime = -FLT_MAX;
+		*(unsigned int*)((DWORD)this + 0x2690) = g_iModelBoneCounter - 1; // m_iMostRecentModelBoneCounter = g_iModelBoneCounter - 1;
+	}
+
 	static CBaseEntity*		GetLocalPlayer();
 	int						GetSequenceActivity(int iSequence);
 	CBaseCombatWeapon*		GetWeapon();
 	int						GetMaxHealth();
 	std::optional<Vector>	GetBonePosition(int iBone);
+	Vector					GetBonePosition(int iBone, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix);
 	int						GetBoneByHash(const FNV1A_t uBoneHash);
 	Vector					GetHitboxPosition(int iHitbox);
 	Vector					GetHitboxPosition(int iHitbox, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix);
-	std::optional<Vector>	GetHitGroupPosition(int iHitGroup);
+	Vector					GetHitboxPosition(int iHitbox, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix, studiohdr_t* pModel);
+	Vector					GetHitGroupPosition(int iHitGroup);
+	Vector					GetHitGroupPosition(int iHitGroup, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix);
 	void					ModifyEyePosition(CBasePlayerAnimState* pAnimState, Vector* vecPosition);
-	void					InvalidateBoneCache();
 	int						PostThink();
 	bool					IsEnemy(CBaseEntity* pEntity);
 	bool					IsTargetingLocal(CBaseEntity* pLocal);
@@ -997,6 +1017,7 @@ public:
 	N_ADD_VARIABLE(float, End, "CFogController->m_fog.end");
 	N_ADD_VARIABLE(float, FarZ, "CFogController->m_fog.farz");
 	N_ADD_VARIABLE(float, MaxDensity, "CFogController->m_fog.maxdensity");
+	#pragma endregion
 };
 
 class CFish

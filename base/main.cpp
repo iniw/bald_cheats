@@ -75,12 +75,11 @@ DWORD WINAPI OnDllAttach(LPVOID lpParameter)
 			throw std::runtime_error(XorStr("failed to set window messages processor"));
 
 		L::Print(XorStr("inputsystem setup complete"));
-		
-		#if 0
-		// start tracking entities
+
+		/* @note will come back to this
 		U::EntityListener.Setup();
-		L::Print(XorStr("entity listener initialized"));
-		#endif
+		L::Print(XorStr("entity listener created"));
+		*/
 
 		// start tracking specified events from vector
 		// @note: all events list: https://wiki.alliedmods.net/Counter-Strike:_Global_Offensive_Events
@@ -89,13 +88,13 @@ DWORD WINAPI OnDllAttach(LPVOID lpParameter)
 
 		// add our functionality in client functions
 		if (!H::Setup())
-			throw std::runtime_error(XorStr("failed initialize hooks"));
+			throw std::runtime_error(XorStr("failed to initialize hooks"));
 
 		L::Print(XorStr("hooks setup complete"));
 
 		// add our functionality in networkable functions
 		if (!P::Setup())
-			throw std::runtime_error(XorStr("failed initialize proxies"));
+			throw std::runtime_error(XorStr("failed to initialize proxies"));
 
 		L::Print(XorStr("proxies applied"));
 
@@ -111,7 +110,7 @@ DWORD WINAPI OnDllAttach(LPVOID lpParameter)
 			L::Print(XorStr("default config loaded"));
 
 		CSkinChanger::Get().Dump();
-		L::Print("dumped skins");
+		L::Print(XorStr("dumped skins"));
 
 		// show message about successful load in logs and in game console
 		L::PushConsoleColor(FOREGROUND_MAGENTA);
@@ -145,9 +144,11 @@ DWORD WINAPI OnDllDetach(LPVOID lpParameter)
 		L::ofsFile.close();
 	#endif
 
-	#if 0
+	/*
+	// destroy entity listener
 	U::EntityListener.Destroy();
-	#endif
+	*/
+
 	// destroy events listener
 	U::EventListener.Destroy();
 

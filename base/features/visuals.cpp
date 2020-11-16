@@ -21,25 +21,16 @@
 // used: _bstr_t
 #include <comdef.h>
 #include "../features/lagcompensation.h"
+#include "../features/legitbot.h"
 
 // @note: avoid store imcolor, store either u32 of imvec4
 void CVisuals::Store()
 {
 	CBaseEntity* pLocal = CBaseEntity::GetLocalPlayer();
-
 	if (pLocal == nullptr)
 		return;
 
 	const float flServerTime = TICKS_TO_TIME(pLocal->GetTickBase());
-
-	// sniper crosshair
-	static CConVar* weapon_debug_spread_show = I::ConVar->FindVar(XorStr("weapon_debug_spread_show"));
-	weapon_debug_spread_show->fnChangeCallbacks.Size() = NULL;
-	weapon_debug_spread_show->SetValue((C::Get<bool>(Vars.bScreenSniperCrosshair) && pLocal->IsAlive() && !pLocal->IsScoped()) ? 3 : 0);
-
-	// check is render initialized
-	if (!D::bInitialized)
-		return;
 
 	const ImVec2 vecScreenSize = ImGui::GetIO().DisplaySize;
 
@@ -69,16 +60,19 @@ void CVisuals::Store()
 	#pragma endregion
 
 	#pragma region visuals_store_screen
-
 	if (C::Get<bool>(Vars.bScreenHitMarker))
 		HitMarker(vecScreenSize, flServerTime, C::Get<Color>(Vars.colScreenHitMarker), C::Get<Color>(Vars.colScreenHitMarkerDamage));
 
-	if (C::Get<bool>(Vars.bSpectatorList))
+	if (C::Get<bool>(Vars.bScreenSpectatorList))
 		SpectatorList(vecScreenSize, pLocal);
 
 	if (C::Get<bool>(Vars.bMiscVeloIndicator) && pLocal->IsAlive())
 		VelocityIndicator(vecScreenSize, pLocal);
 
+	// sniper crosshair
+	static CConVar* weapon_debug_spread_show = I::ConVar->FindVar(XorStr("weapon_debug_spread_show"));
+	weapon_debug_spread_show->fnChangeCallbacks.Size() = NULL;
+	weapon_debug_spread_show->SetValue((C::Get<bool>(Vars.bScreenSniperCrosshair) && pLocal->IsAlive() && !pLocal->IsScoped()) ? 3 : 0);
 	#pragma endregion
 
 	#pragma region visuals_store_esp
@@ -91,10 +85,8 @@ void CVisuals::Store()
 		if (pEntity == nullptr || pEntity->IsDormant())
 			continue;
 
-		const Vector vecOrigin = pEntity->GetOrigin();
-
 		// save entities and calculated distance for sort
-		vecOrder.emplace_back(std::make_pair(pEntity, (pEntity->GetRenderOrigin() - G::vecCamera).Length()));
+		vecOrder.emplace_back(std::make_pair(pEntity, pEntity->GetRenderOrigin().DistTo(G::vecCamera)));
 	}
 
 	// sort entities by distance to make closest entity drawn last to make it easy readable and look nicer
@@ -103,6 +95,12 @@ void CVisuals::Store()
 			return a.second > b.second;
 		});
 
+	if (!pLocal->IsAlive())
+	{
+		CBaseEntity* pObserverEntity = I::ClientEntityList->GetFromHandle<CBaseEntity>(pLocal->GetObserverTargetHandle());
+		if (pObserverEntity != nullptr)
+			pLocal = pObserverEntity;
+	}
 
 	for (const auto& [pEntity, flDistance] : vecOrder)
 	{
@@ -168,14 +166,6 @@ void CVisuals::Store()
 		{
 			if (!C::Get<bool>(Vars.bEspMain) || !pEntity->IsAlive())
 				break;
-
-			if (!pLocal->IsAlive())
-			{
-				const auto pObserverEntity = I::ClientEntityList->GetFromHandle<CBaseEntity>(pLocal->GetObserverTargetHandle());
-				// check is not spectating current entity
-				if (pObserverEntity != nullptr && pObserverEntity == pEntity && *pLocal->GetObserverMode() == OBS_MODE_IN_EYE)
-					break;
-			}
 
 			if (pEntity != pLocal && (pLocal->IsEnemy(pEntity) && C::Get<bool>(Vars.bEspMainEnemies)))
 			{
@@ -303,11 +293,8 @@ void CVisuals::Event(IGameEvent* pEvent, const FNV1A_t uNameHash)
 
 				const auto vecPosition = pEntity->GetHitGroupPosition(pEvent->GetInt(XorStr("hitgroup")));
 
-				if (!vecPosition.has_value())
-					return;
-
 				// add hit info
-				m_deqHitMarkers.emplace_back(HitMarkerObject_t{ vecPosition.value(), pEvent->GetInt(XorStr("dmg_health")), flServerTime + C::Get<float>(Vars.flScreenHitMarkerTime) });
+				m_deqHitMarkers.emplace_back(HitMarkerObject_t{ vecPosition, pEvent->GetInt(XorStr("dmg_health")), flServerTime + C::Get<float>(Vars.flScreenHitMarkerTime) });
 			}
 		}
 	}
@@ -316,14 +303,13 @@ void CVisuals::Event(IGameEvent* pEvent, const FNV1A_t uNameHash)
 bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const DrawModelInfo_t& info, matrix3x4_t* pBoneToWorld, float* flFlexWeights, float* flFlexDelayedWeights, const Vector& vecModelOrigin, int nFlags)
 {
 	static auto oDrawModel = DTR::DrawModel.GetOriginal<decltype(&H::hkDrawModel)>();
+	
 	IClientRenderable* pRenderable = info.pClientEntity;
-
 	if (pRenderable == nullptr)
 		return false;
 
 	// get entity from renderable
 	CBaseEntity* pEntity = pRenderable->GetIClientUnknown()->GetBaseEntity();
-
 	if (pEntity == nullptr)
 		return false;
 
@@ -339,6 +325,22 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 		static IMaterial* pMaterial = nullptr;
 		static IMaterial* pMaterialWall = nullptr;
 		static IMaterial* pMaterialBacktrack = nullptr;
+		/*
+		IMaterial* pPlayerMaterial = I::MaterialSystem->FindMaterial(std::string(I::ModelInfo->GetModel(pEntity->GetModelIndex())->szName).c_str(), TEXTURE_GROUP_MODEL);
+		if (pPlayerMaterial != nullptr && !pMaterial->IsErrorMaterial())
+		{
+			pPlayerMaterial->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, true);
+
+			I::StudioRender->ForcedMaterialOverride(pPlayerMaterial);
+
+			oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
+
+			// clear override
+			I::StudioRender->ForcedMaterialOverride(nullptr);
+
+			return true;
+		}
+		*/
 
 		// set players material
 		// set visible players material
@@ -369,6 +371,7 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 			break;
 		}
 
+		// set backtrack players material
 		switch (C::Get<int>(Vars.iEspChamsEnemiesBacktrack))
 		{
 		case (int)EVisualsEnemiesChams::FLAT:
@@ -391,31 +394,52 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 		const Color colWall = C::Get<Color>(Vars.colEspChamsEnemiesWall);
 		const Color colBacktrack = C::Get<Color>(Vars.colEspChamsEnemiesBacktrack);
 		
+		pEntity->UpdateCollisionBounds();
+
 		/* backtrack chams*/
 		if (C::Get<bool>(Vars.bEspChamsBacktrack) && C::Get<bool>(Vars.bEspChamsEnemiesBacktrack))
 		{
-			std::deque deqRecords = CBacktracking::Get().GetPlayerRecord(pEntity->GetIndex());
+			std::deque<Record_t> deqRecords = { };
+			CBacktracking::Get().GetValidRecords(pEntity->GetIndex(), deqRecords);
 			if (!deqRecords.empty())
 			{
-				if (C::Get<int>(Vars.iEspChamsBacktrackType) == 0)
+				switch (C::Get<int>(Vars.iEspChamsBacktrackType))
+				{
+				case 0:
+				{
+					// grab the first record
+					Record_t record = deqRecords[0];
+
+					// set color
+					pMaterialBacktrack->ColorModulate(colBacktrack.rBase(), colBacktrack.gBase(), colBacktrack.bBase());
+
+					// set alpha
+					pMaterialBacktrack->AlphaModulate(colBacktrack.aBase());
+
+					// disable "$ignorez" flag
+					pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+
+					// set wireframe
+					pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, C::Get<int>(Vars.iEspChamsEnemiesBacktrack) == (int)EVisualsEnemiesChams::WIREFRAME ? true : false);
+
+					// override customized material
+					I::StudioRender->ForcedMaterialOverride(pMaterialBacktrack);
+
+					// draw material
+					oDrawModel(I::StudioRender, 0, pResults, info, record.arrBoneMatrixes.data(), flFlexWeights, flFlexDelayedWeights, record.vecOrigin, nFlags);
+
+					// restore material
+					I::StudioRender->ForcedMaterialOverride(nullptr);
+
+					// draw original player
+					oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
+
+					break;
+				}
+				case 1:
 				{
 					for (auto& record : deqRecords)
 					{
-						if (!CBacktracking::Get().IsValid(record.flSimtime))
-							continue;
-
-						if (record.vecOrigin == pEntity->GetOrigin()) // if the record is going to overlay the player
-						{
-							//restore material
-							I::StudioRender->ForcedMaterialOverride(nullptr);
-
-							// draw original player
-							oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
-
-							// skip this record
-							continue;
-						}
-
 						// set color
 						pMaterialBacktrack->ColorModulate(colBacktrack.rBase(), colBacktrack.gBase(), colBacktrack.bBase());
 
@@ -432,32 +456,29 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 						I::StudioRender->ForcedMaterialOverride(pMaterialBacktrack);
 
 						// draw material
-						oDrawModel(I::StudioRender, 0, pResults, info, record.arrMatrix.data(), flFlexWeights, flFlexDelayedWeights, record.vecOrigin, nFlags);
+						oDrawModel(I::StudioRender, 0, pResults, info, record.arrBoneMatrixes.data(), flFlexWeights, flFlexDelayedWeights, record.vecOrigin, nFlags);
 					}
+
+					// clear override
+					I::StudioRender->ForcedMaterialOverride(nullptr);
+
+					// draw original player
+					oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
+					
+					break;
 				}
-				else
+				case 2:
 				{
-					Record_t record = { }; // record we are going to render
-					bool found = false;
-
-					for (std::deque<Record_t>::reverse_iterator i = deqRecords.rbegin(); i != deqRecords.rend(); ++i) // reverse iterate the record to find the oldest valid record
+					for (int i = 0; i < deqRecords.size(); i++)
 					{
-							const auto& element = *i;
-							if (CBacktracking::Get().IsValid(element.flSimtime)) // found it, break
-							{
-								record = element;
-								found = true; // lmao
-								break;
-							}
-					}
+						// inteprolate color
+						Color colInterpolated = colBacktrack.Interpolate(C::Get<Color>(Vars.colEspChamsEnemiesBacktrackGradient), (1.f / deqRecords.size()) * i);
 
-					if (found)
-					{
 						// set color
-						pMaterialBacktrack->ColorModulate(colBacktrack.rBase(), colBacktrack.gBase(), colBacktrack.bBase());
+						pMaterialBacktrack->ColorModulate(colInterpolated.rBase(), colInterpolated.gBase(), colInterpolated.bBase());
 
 						// set alpha
-						pMaterialBacktrack->AlphaModulate(colBacktrack.aBase());
+						pMaterialBacktrack->AlphaModulate(colInterpolated.aBase());
 
 						// disable "$ignorez" flag
 						pMaterialBacktrack->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
@@ -469,14 +490,17 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 						I::StudioRender->ForcedMaterialOverride(pMaterialBacktrack);
 
 						// draw material
-						oDrawModel(I::StudioRender, 0, pResults, info, record.arrMatrix.data(), flFlexWeights, flFlexDelayedWeights, record.vecOrigin, nFlags);
-
-						// restore material
-						I::StudioRender->ForcedMaterialOverride(nullptr);
-
-						// draw original player
-						oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
+						oDrawModel(I::StudioRender, 0, pResults, info, deqRecords[i].arrBoneMatrixes.data(), flFlexWeights, flFlexDelayedWeights, deqRecords[i].vecOrigin, nFlags);
 					}
+
+					// clear override
+					I::StudioRender->ForcedMaterialOverride(nullptr);
+
+					// draw original player
+					oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
+
+					break;
+				}
 				}
 			}
 		}
@@ -538,46 +562,47 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 	}
 
 	// check for viewmodel sleeves
-	else if (szModelName.find(XorStr("sleeve")) != std::string_view::npos && C::Get<bool>(Vars.bEspChamsViewModel) && C::Get<int>(Vars.iEspChamsViewModel) == (int)EVisualsViewModelChams::NO_DRAW)
+	else if (C::Get<bool>(Vars.bEspChamsViewModel))
 	{
-		// get original sleeves material
-		IMaterial* pSleeveMaterial = I::MaterialSystem->FindMaterial(szModelName.data(), XorStr(TEXTURE_GROUP_MODEL));
-
-		// check is valid material
-		if (pSleeveMaterial == nullptr)
-			return false;
-
-		pSleeveMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
-		I::StudioRender->ForcedMaterialOverride(pSleeveMaterial);
-
-		// we need to clear override
-		return true;
-	}
-	// check for viewmodel @note: u can separate this
-	// check for viewmodel @note: u can separate this
-	else if ((szModelName.find(XorStr("weapons\\v_")) != std::string_view::npos || szModelName.find(XorStr("arms")) != std::string_view::npos) && C::Get<bool>(Vars.bEspChamsViewModel))
-	{
-		// get original viewmodel material
-		IMaterial* pViewModelMaterial = I::MaterialSystem->FindMaterial(szModelName.data(), XorStr(TEXTURE_GROUP_MODEL));
-
-		// check is valid material
-		if (pViewModelMaterial == nullptr)
-			return false;
-
-		if (C::Get<int>(Vars.iEspChamsViewModel) == (int)EVisualsViewModelChams::NO_DRAW)
+		if (C::Get<int>(Vars.iEspChamsViewModel) == (int)EVisualsViewModelChams::NO_DRAW && szModelName.find(XorStr("sleeve")) != std::string_view::npos)
 		{
-			pViewModelMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
-			I::StudioRender->ForcedMaterialOverride(pViewModelMaterial);
+			// get original sleeves material
+			IMaterial* pSleeveMaterial = I::MaterialSystem->FindMaterial(szModelName.data(), XorStr(TEXTURE_GROUP_MODEL));
+
+			// check is valid material
+			if (pSleeveMaterial == nullptr)
+				return false;
+
+			pSleeveMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
+			I::StudioRender->ForcedMaterialOverride(pSleeveMaterial);
 
 			// we need to clear override
 			return true;
 		}
 
-		static IMaterial* pMaterial = nullptr;
-
-		// set viewmodel material
-		switch (C::Get<int>(Vars.iEspChamsViewModel))
+		else if (szModelName.find(XorStr("weapons\\v_")) != std::string_view::npos || szModelName.find(XorStr("arms")) != std::string_view::npos) // apply to weapons and arms
 		{
+			// get original viewmodel material
+			IMaterial* pViewModelMaterial = I::MaterialSystem->FindMaterial(szModelName.data(), XorStr(TEXTURE_GROUP_MODEL));
+
+			// check is valid material
+			if (pViewModelMaterial == nullptr)
+				return false;
+
+			if (C::Get<int>(Vars.iEspChamsViewModel) == (int)EVisualsViewModelChams::NO_DRAW)
+			{
+				pViewModelMaterial->SetMaterialVarFlag(MATERIAL_VAR_NO_DRAW, true);
+				I::StudioRender->ForcedMaterialOverride(pViewModelMaterial);
+
+				// we need to clear override
+				return true;
+			}
+
+			static IMaterial* pMaterial = nullptr;
+
+			// set viewmodel material
+			switch (C::Get<int>(Vars.iEspChamsViewModel))
+			{
 			case (int)EVisualsViewModelChams::FLAT:
 				pMaterial = m_arrMaterials.at(1).second;
 				break;
@@ -593,72 +618,73 @@ bool CVisuals::Chams(CBaseEntity* pLocal, DrawModelResults_t* pResults, const Dr
 			default:
 				pMaterial = m_arrMaterials.at(1).first;
 				break;
-		}
+			}
 
-		// check is valid material
-		if (pMaterial == nullptr || pMaterial->IsErrorMaterial())
-			return false;
+			// check is valid material
+			if (pMaterial == nullptr || pMaterial->IsErrorMaterial())
+				return false;
 
-		// get color
-		const Color colAdditional = C::Get<Color>(Vars.colEspChamsViewModelAdditional);
-		const Color colViewModel = C::Get<Color>(Vars.colEspChamsViewModel);
+			// get color
+			const Color colAdditional = C::Get<Color>(Vars.colEspChamsViewModelAdditional);
+			const Color colViewModel = C::Get<Color>(Vars.colEspChamsViewModel);
 
-		// change material variables
-		if (C::Get<int>(Vars.iEspChamsViewModel) == (int)EVisualsViewModelChams::GLOW)
-		{
-			static bool bEnvMapFresnelFound = false;
-			IMaterialVar* pEnvMapFresnel = pMaterial->FindVar(XorStr("$envmapfresnel"), &bEnvMapFresnelFound);
+			// change material variables
+			if (C::Get<int>(Vars.iEspChamsViewModel) == (int)EVisualsViewModelChams::GLOW)
+			{
+				static bool bEnvMapFresnelFound = false;
+				IMaterialVar* pEnvMapFresnel = pMaterial->FindVar(XorStr("$envmapfresnel"), &bEnvMapFresnelFound);
 
-			// add fresnel effect for glow
-			if (bEnvMapFresnelFound)
-				pEnvMapFresnel->SetInt(1);
+				// add fresnel effect for glow
+				if (bEnvMapFresnelFound)
+					pEnvMapFresnel->SetInt(1);
 
-			static bool bFoundEnvMapTint = false;
-			IMaterialVar* pEnvMapTint = pMaterial->FindVar(XorStr("$envmaptint"), &bFoundEnvMapTint);
+				static bool bFoundEnvMapTint = false;
+				IMaterialVar* pEnvMapTint = pMaterial->FindVar(XorStr("$envmaptint"), &bFoundEnvMapTint);
 
-			// set additional color
-			if (bFoundEnvMapTint)
-				pEnvMapTint->SetVector(colAdditional.rBase(), colAdditional.gBase(), colAdditional.bBase());
+				// set additional color
+				if (bFoundEnvMapTint)
+					pEnvMapTint->SetVector(colAdditional.rBase(), colAdditional.gBase(), colAdditional.bBase());
 
-			// disable color fusion for glow
-			pMaterial->SetMaterialVarFlag(MATERIAL_VAR_ADDITIVE, true);
+				// disable color fusion for glow
+				pMaterial->SetMaterialVarFlag(MATERIAL_VAR_ADDITIVE, true);
 
-			// set "$ignorez" flag to 0 and disable it
-			pMaterial->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+				// set "$ignorez" flag to 0 and disable it
+				pMaterial->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+
+				// set wireframe
+				pMaterial->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, C::Get<int>(Vars.iEspChamsViewModel) == (int)EVisualsViewModelChams::WIREFRAME ? true : false);
+
+				// override customized material
+				I::StudioRender->ForcedMaterialOverride(pMaterial);
+
+				// then draw original with our material
+				oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
+
+				// clear overrides
+				I::StudioRender->ForcedMaterialOverride(nullptr);
+			}
+
+			// set color
+			I::StudioRender->SetColorModulation(colViewModel.Base().data());
+
+			// set alpha
+			I::StudioRender->SetAlphaModulation(colViewModel.aBase());
+
+			// disable color fusion
+			pMaterial->SetMaterialVarFlag(MATERIAL_VAR_ADDITIVE, false);
 
 			// set wireframe
 			pMaterial->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, C::Get<int>(Vars.iEspChamsViewModel) == (int)EVisualsViewModelChams::WIREFRAME ? true : false);
 
+			// set "$ignorez" flag to 0 and disable it
+			pMaterial->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
+
 			// override customized material
 			I::StudioRender->ForcedMaterialOverride(pMaterial);
 
-			// then draw original with our material
-			oDrawModel(I::StudioRender, 0, pResults, info, pBoneToWorld, flFlexWeights, flFlexDelayedWeights, vecModelOrigin, nFlags);
-
-			// clear overrides
-			I::StudioRender->ForcedMaterialOverride(nullptr);
+			// we need to clear override
+			return true;
 		}
-
-		// set color
-		I::StudioRender->SetColorModulation(colViewModel.Base().data());
-
-		// set alpha
-		I::StudioRender->SetAlphaModulation(colViewModel.aBase());
-
-		// disable color fusion
-		pMaterial->SetMaterialVarFlag(MATERIAL_VAR_ADDITIVE, false);
-
-		// set wireframe
-		pMaterial->SetMaterialVarFlag(MATERIAL_VAR_WIREFRAME, C::Get<int>(Vars.iEspChamsViewModel) == (int)EVisualsViewModelChams::WIREFRAME ? true : false);
-
-		// set "$ignorez" flag to 0 and disable it
-		pMaterial->SetMaterialVarFlag(MATERIAL_VAR_IGNOREZ, false);
-
-		// override customized material
-		I::StudioRender->ForcedMaterialOverride(pMaterial);
-
-		// we need to clear override
-		return true;
 	}
 
 	return false;
@@ -694,14 +720,14 @@ void CVisuals::Glow(CBaseEntity* pLocal)
 		if (!D::WorldToScreen(vecOrigin, vecScreen))
 			continue;
 
+		bool bIsVisible = pEntity->IsPlayer() ? pLocal->IsVisible(pEntity, pEntity->GetEyePosition(false)) : pLocal->IsVisible(pEntity, vecOrigin);
+
 		CBaseClient* pClientClass = pEntity->GetClientClass();
 		if (pClientClass == nullptr)
 			continue;
 
 		// get class id
 		const EClassIndex nIndex = pClientClass->nClassID;
-
-		bool bIsVisible = pEntity->IsPlayer() ? pLocal->IsVisible(pEntity, pEntity->GetEyePosition(false)) : pLocal->IsVisible(pEntity, vecOrigin);
 
 		switch (nIndex)
 		{
@@ -744,7 +770,7 @@ void CVisuals::Glow(CBaseEntity* pLocal)
 
 			// get weapon owner
 			const CBaseEntity* pOwner = I::ClientEntityList->GetFromHandle<CBaseEntity>(pEntity->GetOwnerEntityHandle());
-			if (pOwner != nullptr)
+			if (pOwner != nullptr) // only apply to dropped weapons
 				break;
 
 			if (C::Get<bool>(Vars.bEspGlowWeapons) && bIsVisible ? C::Get<bool>(Vars.bEspGlowWeaponsVisible) : C::Get<bool>(Vars.bEspGlowWeaponsWall))
@@ -752,30 +778,6 @@ void CVisuals::Glow(CBaseEntity* pLocal)
 			break;
 		}
 	}
-}
-
-void CVisuals::Removals()
-{
-	// disable 3d skybox
-	static CConVar* r_3dsky = I::ConVar->FindVar("r_3dsky");
-	r_3dsky->fnChangeCallbacks.Size() = NULL;
-	r_3dsky->SetValue(!C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_3DSKY));
-
-	// disable shadows
-	static CConVar* cl_csm_enabled = I::ConVar->FindVar("cl_csm_enabled");
-	cl_csm_enabled->fnChangeCallbacks.Size() = NULL;
-	cl_csm_enabled->SetValue(!C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_SHADOWS));
-
-	// disable post-proccesing
-	static CConVar* mat_postprocess_enable = I::ConVar->FindVar(XorStr("mat_postprocess_enable"));
-	mat_postprocess_enable->fnChangeCallbacks.Size() = NULL;
-	mat_postprocess_enable->SetValue(!C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_POSTPROCESSING));
-
-	/* disable decals @note doesn't work for some fucking reason
-	static CConVar* r_drawdecals = I::ConVar->FindVar(XorStr("r_drawdecals"));
-	r_drawdecals->fnChangeCallbacks.Size() = NULL;
-	r_drawdecals->SetValue(!C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_DECALS));
-	*/
 }
 
 bool CVisuals::GetBoundingBox(CBaseEntity* pEntity, Box_t* pBox) const
@@ -1117,6 +1119,41 @@ void CVisuals::NightMode()
 	}
 }
 
+void CVisuals::SkyChanger(EClientFrameStage stage)
+{
+	static CConVar* sv_skyname = I::ConVar->FindVar(XorStr("sv_skyname"));
+	if (sv_skyname == nullptr)
+		return;
+
+	if (!(stage == FRAME_RENDER_START || stage == FRAME_RENDER_END))
+		return;
+
+	if (C::Get<int>(Vars.iWorldCustomSky))
+		U::LoadSkybox(arrVisualsSkyboxes[C::Get<int>(Vars.iWorldCustomSky)]);
+	else
+		U::LoadSkybox(sv_skyname->GetString());
+}
+
+void CVisuals::Removals()
+{
+	{
+		// disable 3d skybox
+		static CConVar* r_3dsky = I::ConVar->FindVar("r_3dsky");
+		r_3dsky->fnChangeCallbacks.Size() = NULL;
+		r_3dsky->SetValue(!C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_3DSKY));
+
+		// disable shadows
+		static CConVar* cl_csm_enabled = I::ConVar->FindVar("cl_csm_enabled");
+		cl_csm_enabled->fnChangeCallbacks.Size() = NULL;
+		cl_csm_enabled->SetValue(!C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_SHADOWS));
+
+		// disable post-proccesing
+		static CConVar* mat_postprocess_enable = I::ConVar->FindVar(XorStr("mat_postprocess_enable"));
+		mat_postprocess_enable->fnChangeCallbacks.Size() = NULL;
+		mat_postprocess_enable->SetValue(!C::Get<std::vector<bool>>(Vars.vecWorldRemovals).at(REMOVAL_POSTPROCESSING));
+	}
+}
+
 void CVisuals::Fog(CFogController* pController) const
 {
 	pController->Enable() = C::Get<bool>(Vars.bWorldFog);
@@ -1186,8 +1223,6 @@ void CVisuals::PlantedBomb(CPlantedC4* pBomb, float flServerTime, const Vector2D
 
 	// calculate bomb timer-based width factor
 	const float flFactor = flCurrentTime / flMaxTime;
-	// calculate bomb timer-based color
-	const float flHue = (flFactor * 120.f) / 360.f;
 
 	/* timer bar */
 	if (flFactor > 0.f)
@@ -1195,7 +1230,7 @@ void CVisuals::PlantedBomb(CPlantedC4* pBomb, float flServerTime, const Vector2D
 		// background
 		D::AddRect(ImVec2(ctx.box.left, ctx.box.bottom), ImVec2(ctx.box.right, ctx.box.bottom + 4.f), colFrame, IMGUI_RECT_FILLED);
 		// bar
-		D::AddRect(ImVec2(ctx.box.left + 1.f, ctx.box.bottom + 1.f), ImVec2((ctx.box.left + 1.f) + (ctx.box.width - 1.f) * flFactor, ctx.box.bottom + 3.f), Color::FromHSB(flHue, 1.f, 1.f), IMGUI_RECT_FILLED);
+		D::AddRect(ImVec2(ctx.box.left + 1.f, ctx.box.bottom + 1.f), ImVec2((ctx.box.left + 1.f) + (ctx.box.width - 1.f) * flFactor, ctx.box.bottom + 3.f), Color(255, 255, 255), IMGUI_RECT_FILLED);
 		ctx.arrPadding.at(DIR_BOTTOM) += 4.f;
 	}
 
@@ -1376,27 +1411,11 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 		Skeleton(pEntity);
 
 	if (C::Get<bool>(Vars.bEspMainPlayerBacktrack))
-	{
-		std::deque deqRecords = CBacktracking::Get().GetPlayerRecord(pEntity->GetIndex());
-		if (!deqRecords.empty())
-		{
-			for (auto& record : deqRecords)
-			{
-				if (!CBacktracking::Get().IsValid(record.flSimtime)) // only draw valid records
-					continue;
+		VisualizeBacktrack(pEntity->GetIndex());
 
-				Vector2D vecScreen = { };
-				if (!D::WorldToScreen(record.vecHeadPos, vecScreen))
-					return;
-
-				D::AddRect(ImVec2(vecScreen.x - 0.5f, vecScreen.y - 0.5f), ImVec2(vecScreen.x + 0.5f, vecScreen.y + 0.5f), C::Get<Color>(Vars.colEspMainPlayerBacktrack), IMGUI_RECT_FILLED);
-			}
-		}
-	}
-
-	const float flMainFontSize = 12.f;
-	const float flOtherFontSize = 10.f;
-	const float flFlagsFontSize = 8.f;
+	constexpr float flMainFontSize = 12.f;
+	constexpr float flOtherFontSize = 10.f;
+	constexpr float flFlagsFontSize = 8.f;
 
 	#pragma region visuals_player_top
 	if (C::Get<bool>(Vars.bEspMainPlayerFlash) && pEntity->GetFlashDuration() > 0.2f)
@@ -1428,13 +1447,21 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 	#pragma endregion
 
 	#pragma region visuals_player_bottom
+	// ammo bar
+	if (C::Get<bool>(Vars.bEspMainPlayerAmmo))
+		if(CBaseCombatWeapon* pActiveWeapon = pEntity->GetWeapon(); pActiveWeapon != nullptr)
+			AmmoBar(pEntity, pActiveWeapon, ctx, C::Get<Color>(Vars.colEspMainPlayerAmmo), Color(0, 0, 0, 150), Color(0, 0, 0, 150));
+
+	if (C::Get<bool>(Vars.bEspMainPlayerHealth))
+	{
+		std::string szHealthText = std::to_string(pEntity->GetHealth());
+		const ImVec2 vecHealthSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szHealthText.data());
+		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.left + ctx.box.width * 0.5f - vecHealthSize.x * 0.5f, ctx.box.bottom + 2 + ctx.arrPadding.at(DIR_BOTTOM)), szHealthText.data(), C::Get<Color>(Vars.colEspMainPlayerHealth), IMGUI_TEXT_DROPSHADOW, colOutline);
+		ctx.arrPadding.at(DIR_BOTTOM) += vecHealthSize.y;
+	}
 	// get active weapon
 	if (CBaseCombatWeapon* pActiveWeapon = pEntity->GetWeapon(); pActiveWeapon != nullptr)
 	{
-		// ammo bar
-		if (C::Get<bool>(Vars.bEspMainPlayerAmmo))
-			AmmoBar(pEntity, pActiveWeapon, ctx, C::Get<Color>(Vars.colEspMainPlayerAmmo), Color(0, 0, 0, 150), Color(0, 0, 0, 150));
-
 		// get all other weapons
 		if (C::Get<bool>(Vars.bEspMainPlayerWeaponIcon) || C::Get<bool>(Vars.bEspMainPlayerWeaponText))
 		{
@@ -1450,7 +1477,7 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 					std::string szWeaponName = static_cast<const char*>(bstrWeaponName);
 
 					const ImVec2 vecTextSize = F::Roboto->CalcTextSizeA(10.f, FLT_MAX, 0.0f, szWeaponName.data());
-					D::AddText(F::Roboto, 10.f, ImVec2(ctx.box.left + ctx.box.width * 0.5f - vecTextSize.x * 0.5f, ctx.box.bottom + 2 + ctx.arrPadding.at(DIR_BOTTOM)), szWeaponName, C::Get<Color>(Vars.colEspMainPlayerWeaponText), IMGUI_TEXT_DROPSHADOW, colOutline);
+					D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.left + ctx.box.width * 0.5f - vecTextSize.x * 0.5f, ctx.box.bottom + 2 + ctx.arrPadding.at(DIR_BOTTOM)), szWeaponName, C::Get<Color>(Vars.colEspMainPlayerWeaponText), IMGUI_TEXT_DROPSHADOW, colOutline);
 					ctx.arrPadding.at(DIR_BOTTOM) += vecTextSize.y;
 				}
 
@@ -1473,20 +1500,21 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 	#pragma endregion
 
 	#pragma region visuals_player_left
-	if (C::Get<bool>(Vars.bEspMainPlayerHealth))
+	if (C::Get<bool>(Vars.bEspMainPlayerHealthBar))
 	{
 		// calculate hp-based color
 		const float flFactor = static_cast<float>(pEntity->GetHealth()) / static_cast<float>(pEntity->GetMaxHealth());
 		const float flHue = (flFactor * 120.f) / 360.f;
 		HealthBar(ctx, flFactor, pEntity->GetHealth(), pEntity->GetMaxHealth(), Color::FromHSB(flHue, 1.f, 1.f), Color(0, 0, 0, 150), Color(0, 0, 0, 150));
 	}
+	#pragma endregion
 
 	#pragma region visuals_player_right
 	if (C::Get<std::vector<bool>>(Vars.vecEspMainPlayerFlags).at(INFO_FLAG_ARMOR) && pEntity->GetArmor() > 0)
 	{
 		const char* szArmorText = pEntity->HasHelmet() ? "hk" : "k";
 		const ImVec2 vecArmorSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szArmorText);
-		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.right + 2, ctx.box.top + ctx.arrPadding.at(DIR_RIGHT)), szArmorText, Color(255, 255, 255), IMGUI_TEXT_DROPSHADOW, colOutline);
+		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.right + 2, ctx.box.top + ctx.arrPadding.at(DIR_RIGHT)), szArmorText, C::Get<Color>(Vars.colEspMainPlayerFlags), IMGUI_TEXT_DROPSHADOW, colOutline);
 		ctx.arrPadding.at(DIR_RIGHT) += vecArmorSize.y;
 	}
 
@@ -1494,7 +1522,7 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 	{
 		constexpr const char* szKitText = "kit";
 		const ImVec2 vecKitSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szKitText);
-		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.right + 2, ctx.box.top + ctx.arrPadding.at(DIR_RIGHT)), szKitText, Color(255, 255, 255), IMGUI_TEXT_DROPSHADOW, colOutline);
+		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.right + 2, ctx.box.top + ctx.arrPadding.at(DIR_RIGHT)), szKitText, C::Get<Color>(Vars.colEspMainPlayerFlags), IMGUI_TEXT_DROPSHADOW, colOutline);
 		ctx.arrPadding.at(DIR_RIGHT) += vecKitSize.y;
 	}
 
@@ -1502,7 +1530,7 @@ void CVisuals::Player(CBaseEntity* pLocal, CBaseEntity* pEntity, Context_t& ctx,
 	{
 		constexpr const char* szScopedText = "scoped";
 		const ImVec2 vecScopedSize = F::Roboto->CalcTextSizeA(flOtherFontSize, FLT_MAX, 0.0f, szScopedText);
-		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.right + 2, ctx.box.top + ctx.arrPadding.at(DIR_RIGHT)), szScopedText, Color(255, 255, 255), IMGUI_TEXT_DROPSHADOW, colOutline);
+		D::AddText(F::Roboto, flOtherFontSize, ImVec2(ctx.box.right + 2, ctx.box.top + ctx.arrPadding.at(DIR_RIGHT)), szScopedText, C::Get<Color>(Vars.colEspMainPlayerFlags), IMGUI_TEXT_DROPSHADOW, colOutline);
 		ctx.arrPadding.at(DIR_RIGHT) += vecScopedSize.y;
 	}
 	#pragma endregion
@@ -1518,7 +1546,7 @@ void CVisuals::HealthBar(Context_t& ctx, const float flFactor, const int iHealth
 	// background
 	D::AddRect(ImVec2(ctx.box.left - 5 - ctx.arrPadding.at(DIR_LEFT), ctx.box.top), ImVec2(ctx.box.left - 3 - ctx.arrPadding.at(DIR_LEFT), ctx.box.bottom), colBackground, IMGUI_RECT_FILLED | IMGUI_RECT_OUTLINE, colOutline);
 	// bar
-	D::AddRect(ImVec2(ctx.box.left - 5 - ctx.arrPadding.at(DIR_LEFT), ctx.box.bottom - (ctx.box.height * flFactor)), ImVec2(ctx.box.left - 3 - ctx.arrPadding.at(DIR_LEFT), ctx.box.bottom), C::Get<bool>(Vars.bEspMainPlayerOverrideHealthColor) ? C::Get<Color>(Vars.colEspMainPlayerHealth) : colPrimary, IMGUI_RECT_FILLED);
+	D::AddRect(ImVec2(ctx.box.left - 5 - ctx.arrPadding.at(DIR_LEFT), ctx.box.bottom - (ctx.box.height * flFactor)), ImVec2(ctx.box.left - 3 - ctx.arrPadding.at(DIR_LEFT), ctx.box.bottom), C::Get<bool>(Vars.bEspMainPlayerOverrideHealthBarColor) ? C::Get<Color>(Vars.colEspMainPlayerHealthBar) : colPrimary, IMGUI_RECT_FILLED);
 	// text
 	if (iHealth < iMaxHealth)
 	{  
@@ -1590,8 +1618,9 @@ void CVisuals::Skeleton(CBaseEntity* pEntity)
 	if (pStudioModel == nullptr)
 		return;
 
-	Vector2D vecScreenParent, vecScreenChild;
-	Vector vecParent, vecChild;
+	std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix;
+
+	pEntity->SetupBones(arrCustomMatrix.data(), MAXSTUDIOBONES, BONE_USED_BY_HITBOX, I::Globals->flCurrentTime); // setupbones here to avoid setting up a lot in the loop
 
 	for (int i = 0; i < pStudioModel->nBones; i++)
 	{
@@ -1599,18 +1628,18 @@ void CVisuals::Skeleton(CBaseEntity* pEntity)
 
 		if (pBone && pBone->iFlags & BONE_USED_BY_HITBOX && pBone->iParent != -1)
 		{
-			vecParent = pEntity->GetBonePosition(pBone->iParent).value();
-			vecChild = pEntity->GetBonePosition(i).value();
+			Vector vecParent = pEntity->GetBonePosition(pBone->iParent, arrCustomMatrix);
+			Vector vecChild = pEntity->GetBonePosition(i, arrCustomMatrix);
 
 			int iChestBone = BONE_SPINE_3;
 
-			Vector vecUpperDirection = pEntity->GetBonePosition(iChestBone + 1).value() - pEntity->GetBonePosition(iChestBone).value();
-			Vector vecBreastBone = pEntity->GetBonePosition(iChestBone).value() + vecUpperDirection / 2.f;
+			Vector vecUpperDirection = pEntity->GetBonePosition(iChestBone + 1, arrCustomMatrix) - pEntity->GetBonePosition(iChestBone, arrCustomMatrix);
+			Vector vecBreastBone = pEntity->GetBonePosition(iChestBone, arrCustomMatrix) + vecUpperDirection / 2.f;
 			
 			Vector vecDeltaParent = vecParent - vecBreastBone;
 			Vector vecDeltaChild = vecChild - vecBreastBone;
 
-			if ((vecDeltaParent.Length() < 9 && vecDeltaChild.Length() < 9))
+			if (vecDeltaParent.Length() < 9 && vecDeltaChild.Length() < 9)
 				vecParent = vecBreastBone;
 
 			if (i == iChestBone - 1)
@@ -1619,9 +1648,28 @@ void CVisuals::Skeleton(CBaseEntity* pEntity)
 			if (std::abs(vecDeltaChild.z) < 5 && (vecDeltaParent.Length() < 5 && vecDeltaChild.Length() < 5) || i == iChestBone)
 				continue;
 
+			Vector2D vecScreenParent = { }, vecScreenChild = { };
+
 			if (D::WorldToScreen(vecParent, vecScreenParent) && D::WorldToScreen(vecChild, vecScreenChild))
 				D::AddLine(ImVec2(vecScreenParent.x, vecScreenParent.y), ImVec2(vecScreenChild.x, vecScreenChild.y), C::Get<Color>(Vars.colEspMainPlayerSkeleton));
 		}
 	}
 
+}
+
+void CVisuals::VisualizeBacktrack(int iEntityIndex)
+{
+	std::deque<Record_t> deqRecords = { };
+	CBacktracking::Get().GetValidRecords(iEntityIndex, deqRecords);
+	if (!deqRecords.empty())
+	{
+		for (auto& record : deqRecords)
+		{
+			Vector2D vecScreen = { };
+			if (!D::WorldToScreen(record.vecHeadPos, vecScreen))
+				continue;
+
+			D::AddRect(ImVec2(vecScreen.x - 0.5f, vecScreen.y - 0.5f), ImVec2(vecScreen.x + 0.5f, vecScreen.y + 0.5f), C::Get<Color>(Vars.colEspMainPlayerBacktrack), IMGUI_RECT_FILLED);
+		}
+	}
 }

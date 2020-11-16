@@ -99,10 +99,12 @@ struct LegitbotVariables_t
 	int		iAimKey	= 0;
 	float	flAimFov = 0.0f;
 	int		iAimHitbox = 0;
+	int		iAimPriorityHitbox = 0;
 	bool	bAimAtBacktrack = false;
 	bool	bAimSilent = false;
 	float	flAimSmooth = 1.0f;
 	bool	bAimRCS = false;
+	bool	bAimStandaloneRCS = false;
 	bool	bAimAutoWall = false;
 	int		iAimAutoWallMinDamage = 0;
 
@@ -111,10 +113,12 @@ struct LegitbotVariables_t
 		iAimKey = 0;
 		flAimFov = 0.0f;
 		iAimHitbox = 0;
+		iAimPriorityHitbox = 0;
 		bAimAtBacktrack = false;
 		bAimSilent = false;
 		flAimSmooth = 1.0f;
 		bAimRCS = false;
+		bAimStandaloneRCS = false;
 		bAimAutoWall = false;
 		iAimAutoWallMinDamage = 0;
 	}
@@ -158,6 +162,7 @@ struct Variables_t
 	// aimbot
 	C_ADD_VARIABLE(bool, bLegit, false);
 	C_ADD_VARIABLE(int, iLegitWeapon, false);
+	C_ADD_VARIABLE(bool, bLegitDrawFOV, false);
 	C_ADD_VARIABLE_VECTOR(LegitbotVariables_t, 6U, vecLegitVars, LegitbotVariables_t());
 
 	//backtracking
@@ -169,13 +174,15 @@ struct Variables_t
 	C_ADD_VARIABLE(int, iTriggerKey, 0);
 	C_ADD_VARIABLE(int, iTriggerDelay, 0);
 	C_ADD_VARIABLE(bool, bTriggerAutoWall, false);
+	C_ADD_VARIABLE(bool, bTriggerMagnet, false);
+	C_ADD_VARIABLE(float, flTriggerMagnetFov, 0.f);
+	C_ADD_VARIABLE(float, flTriggerMagnetSmooth, 0.f);
+	C_ADD_VARIABLE(bool, bTriggerMagnetRCS, false);
 	C_ADD_VARIABLE(int, iTriggerMinimumDamage, 70);
 
 	C_ADD_VARIABLE(bool, bTriggerHead, true);
-	C_ADD_VARIABLE(bool, bTriggerChest, true);
-	C_ADD_VARIABLE(bool, bTriggerStomach, true);
-	C_ADD_VARIABLE(bool, bTriggerArms, false);
-	C_ADD_VARIABLE(bool, bTriggerLegs, false);
+	C_ADD_VARIABLE(bool, bTriggerChest, false);
+	C_ADD_VARIABLE(bool, bTriggerStomach, false);
 	#pragma endregion
 
 	#pragma region variables_visuals
@@ -201,7 +208,9 @@ struct Variables_t
 	/* left */
 	C_ADD_VARIABLE(bool, bEspMainPlayerHealth, false);
 	C_ADD_VARIABLE(Color, colEspMainPlayerHealth, Color(255, 255, 255, 255));
-	C_ADD_VARIABLE(bool, bEspMainPlayerOverrideHealthColor, false);
+	C_ADD_VARIABLE(bool, bEspMainPlayerHealthBar, false);
+	C_ADD_VARIABLE(Color, colEspMainPlayerHealthBar, Color(255, 255, 255, 255));
+	C_ADD_VARIABLE(bool, bEspMainPlayerOverrideHealthBarColor, false);
 
 	/* top */
 	C_ADD_VARIABLE(bool, bEspMainPlayerName, false);
@@ -212,6 +221,7 @@ struct Variables_t
 	C_ADD_VARIABLE(Color, colEspMainPlayerNadeKill, Color(255, 255, 255, 255));
 
 	/* right */
+	C_ADD_VARIABLE(Color, colEspMainPlayerFlags, Color(255, 255, 255, 255));
 	C_ADD_VARIABLE_VECTOR(bool, INFO_FLAG_MAX, vecEspMainPlayerFlags, false);
 
 	/* bottom */
@@ -292,6 +302,7 @@ struct Variables_t
 	C_ADD_VARIABLE(int, iEspChamsBacktrackType, 0);
 	C_ADD_VARIABLE(bool, bEspChamsEnemiesBacktrack, false);
 	C_ADD_VARIABLE(Color, colEspChamsEnemiesBacktrack, Color(25, 25, 25, 75));
+	C_ADD_VARIABLE(Color, colEspChamsEnemiesBacktrackGradient, Color(25, 25, 25, 75));
 	C_ADD_VARIABLE(int, iEspChamsEnemiesBacktrack, static_cast<int>(EVisualsEnemiesChams::COVERED));
 
 	// world
@@ -301,14 +312,15 @@ struct Variables_t
 	C_ADD_VARIABLE(Color, colWorldFogPrimary, Color(255, 255, 255, 255));
 	C_ADD_VARIABLE(int, iWorldFogStart, 200);
 	C_ADD_VARIABLE(int, iWorldFogEnd, 1500);
-	C_ADD_VARIABLE(bool, bSpectatorList, false);
 	C_ADD_VARIABLE(int, iWorldThirdPersonKey, 0);
 	C_ADD_VARIABLE(int, iWorldThirdPersonOffset, 150);
 	C_ADD_VARIABLE_VECTOR(bool, REMOVAL_MAX, vecWorldRemovals, false);
+	C_ADD_VARIABLE(int, iWorldCustomSky, 0);
 
-	// on-screen
+	// screen
 	C_ADD_VARIABLE(float, flScreenCameraFOV, 0.f);
 	C_ADD_VARIABLE(float, flScreenViewModelFOV, 0.f);
+	C_ADD_VARIABLE(bool, bScreenSpectatorList, false);
 	C_ADD_VARIABLE(bool, bScreenSniperCrosshair, false);
 	C_ADD_VARIABLE(bool, bScreenHitMarker, false);
 	C_ADD_VARIABLE(bool, bScreenHitMarkerDamage, false);
@@ -339,6 +351,8 @@ struct Variables_t
 	C_ADD_VARIABLE(int, iMiscBlockBotKey, 0);
 	C_ADD_VARIABLE(bool, bMiscFakeLatency, false);
 	C_ADD_VARIABLE(int, iMiscFakeLatencyAmount, 100);
+	C_ADD_VARIABLE(std::string, szMiscClantag, "");
+	C_ADD_VARIABLE(std::string, szMiscName, "");
 	C_ADD_VARIABLE(bool, bMiscRevealRanks, false);
 	C_ADD_VARIABLE(bool, bMiscUnlockInventory, false);
 	C_ADD_VARIABLE(bool, bMiscAntiUntrusted, true);

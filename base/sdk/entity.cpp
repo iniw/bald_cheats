@@ -50,6 +50,13 @@ std::optional<Vector> CBaseEntity::GetBonePosition(int iBone)
 	return std::nullopt;
 }
 
+Vector CBaseEntity::GetBonePosition(int iBone, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix)
+{
+	assert(iBone > BONE_INVALID && iBone < MAXSTUDIOBONES); // given invalid bone index for getboneposition
+
+	return arrCustomMatrix.at(iBone).at(3);
+}
+
 int CBaseEntity::GetBoneByHash(const FNV1A_t uBoneHash)
 {
 	if (auto pModel = this->GetModel(); pModel != nullptr)
@@ -118,7 +125,27 @@ Vector CBaseEntity::GetHitboxPosition(int iHitbox, std::array<matrix3x4_t, MAXST
 	return { };
 }
 
-std::optional<Vector> CBaseEntity::GetHitGroupPosition(int iHitGroup)
+Vector CBaseEntity::GetHitboxPosition(int iHitbox, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix, studiohdr_t* pStudioModel)
+{
+	assert(iHitbox > HITBOX_INVALID && iHitbox < HITBOX_MAX); // given invalid hitbox index for gethitboxposition
+
+	if (pStudioModel == nullptr)
+		return { };
+
+	if (auto pHitbox = pStudioModel->GetHitbox(iHitbox, 0); pHitbox != nullptr)
+	{
+		// get mins/maxs by bone
+		Vector vecMin = M::VectorTransform(pHitbox->vecBBMin, arrCustomMatrix.at(pHitbox->iBone));
+		Vector vecMax = M::VectorTransform(pHitbox->vecBBMax, arrCustomMatrix.at(pHitbox->iBone));
+
+		// get center
+		return (vecMin + vecMax) * 0.5f;
+	}
+
+	return { };
+}
+
+Vector CBaseEntity::GetHitGroupPosition(int iHitGroup)
 {
 	assert(iHitGroup >= HITGROUP_GENERIC && iHitGroup <= HITGROUP_GEAR); // given invalid hitbox index for gethitgroupposition
 
@@ -156,18 +183,43 @@ std::optional<Vector> CBaseEntity::GetHitGroupPosition(int iHitGroup)
 		}
 	}
 
-	return std::nullopt;
+	return { };
 }
 
-
-
-void CBaseEntity::InvalidateBoneCache()
+Vector CBaseEntity::GetHitGroupPosition(int iHitGroup, std::array<matrix3x4_t, MAXSTUDIOBONES> arrCustomMatrix)
 {
-	static DWORD addr = (DWORD)MEM::FindPattern(CLIENT_DLL, XorStr("80 3D ? ? ? ? ? 74 16 A1 ? ? ? ? 48 C7 81"));
+	assert(iHitGroup >= HITGROUP_GENERIC && iHitGroup <= HITGROUP_GEAR); // given invalid hitbox index for gethitgroupposition
 
-	unsigned long g_iModelBoneCounter = **(unsigned long**)(addr + 10);
-	*(unsigned int*)((DWORD)this + 0x2924) = 0xFF7FFFFF; // m_flLastBoneSetupTime = -FLT_MAX;
-	*(unsigned int*)((DWORD)this + 0x2690) = (g_iModelBoneCounter - 1); // m_iMostRecentModelBoneCounter = g_iModelBoneCounter - 1;
+	if (auto pModel = this->GetModel(); pModel != nullptr)
+	{
+		if (auto pStudioModel = I::ModelInfo->GetStudioModel(pModel); pStudioModel != nullptr)
+		{
+			if (auto pHitboxSet = pStudioModel->GetHitboxSet(this->GetHitboxSet()); pHitboxSet != nullptr)
+			{
+				mstudiobbox_t* pHitbox = nullptr;
+				for (int i = 0; i < pHitboxSet->nHitboxes; i++)
+				{
+					pHitbox = pHitboxSet->GetHitbox(i);
+
+					// check is reached needed group
+					if (pHitbox->iGroup == iHitGroup)
+						break;
+				}
+
+				if (pHitbox != nullptr)
+				{
+					// get mins/maxs by bone
+					Vector vecMin = M::VectorTransform(pHitbox->vecBBMin, arrCustomMatrix.at(pHitbox->iBone));
+					Vector vecMax = M::VectorTransform(pHitbox->vecBBMax, arrCustomMatrix.at(pHitbox->iBone));
+
+					// get center
+					return (vecMin + vecMax) * 0.5f;
+				}
+			}
+		}
+	}
+
+	return { };
 }
 
 void CBaseEntity::ModifyEyePosition(CBasePlayerAnimState* pAnimState, Vector* vecPosition)

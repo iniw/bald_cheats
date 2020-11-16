@@ -27,6 +27,7 @@ namespace VTABLE
 		RESETEX = 132,
 
 		/* client table */
+		LEVELINITPOSTENTITY = 6,
 		FRAMESTAGENOTIFY = 37,
 
 		/* panel table */
@@ -78,6 +79,7 @@ namespace VTABLE
 
 		/* convar table */
 		GETBOOL = 13,
+		GETINT = 12,
 
 		/* netchannel table */
 		SENDNETMSG = 40,
@@ -85,7 +87,12 @@ namespace VTABLE
 
 		/* filesystem table */
 		GETUNVERIFIEDFILHEHASHES = 101,
-		LOOSEFILEALLOWED = 128
+		LOOSEFILEALLOWED = 128,
+
+		/* ccsplayer table */
+		DOEXTRABONEPROCESSING = 197,
+		STANDARDBLENDINGRULES = 205,
+		UPDATECLIENTSIDEANIMATION = 223,
 	};
 }
 
@@ -97,25 +104,32 @@ namespace DTR
 {
 	inline CDetourHook Reset;
 	inline CDetourHook EndScene;
+	inline CDetourHook LevelInitPostEntity;
 	inline CDetourHook FrameStageNotify;
 	inline CDetourHook OverrideView;
-	inline CDetourHook OverrideMouseInput;
 	inline CDetourHook CreateMove;
 	inline CDetourHook SendNetMsg;
 	inline CDetourHook SendDatagram;
 	inline CDetourHook GetViewModelFOV;
 	inline CDetourHook DoPostScreenEffects;
 	inline CDetourHook IsConnected;
+	inline CDetourHook IsHLTV;
 	inline CDetourHook ListLeavesInBox;
 	inline CDetourHook PaintTraverse;
 	inline CDetourHook DrawModel;
+	inline CDetourHook GetLocalViewAngles;
 	inline CDetourHook RunCommand;
 	inline CDetourHook SendMessageGC;
 	inline CDetourHook RetrieveMessage;
 	inline CDetourHook LockCursor;
 	inline CDetourHook PlaySoundSurface;
-	inline CDetourHook SvCheatsGetBool;
-	inline CDetourHook GetLocalViewAngles;
+	inline CDetourHook sv_cheatsGetBool;
+	inline CDetourHook r_3dskyGetInt;
+	inline CDetourHook cl_csm_enabledGetBool;
+	inline CDetourHook mat_postprocess_enableGetBool;
+	inline CDetourHook weapon_debug_spread_showGetInt;
+	inline CDetourHook DoExtraBoneProcessing;
+	inline CDetourHook StandardBlendingRules;
 }
 
 /*
@@ -136,21 +150,28 @@ namespace H
 	void	FASTCALL	hkPaintTraverse(ISurface* thisptr, int edx, unsigned int uPanel, bool bForceRepaint, bool bForce);
 	void	FASTCALL	hkPlaySound(ISurface* thisptr, int edx, const char* szFileName);
 	void	FASTCALL	hkLockCursor(ISurface* thisptr, int edx);
+	void	FASTCALL	hkLevelInitPostEntity(IBaseClientDll* thisptr, int edx);
 	void	FASTCALL	hkFrameStageNotify(IBaseClientDll* thisptr, int edx, EClientFrameStage stage);
 	void	FASTCALL	hkDrawModel(IStudioRender* thisptr, int edx, DrawModelResults_t* pResults, const DrawModelInfo_t& info, matrix3x4_t* pBoneToWorld, float* flFlexWeights, float* flFlexDelayedWeights, const Vector& vecModelOrigin, int nFlags);
 	int		FASTCALL	hkListLeavesInBox(void* thisptr, int edx, const Vector& vecMins, const Vector& vecMaxs, unsigned short* puList, int nListMax);
 	bool	FASTCALL	hkIsConnected(IEngineClient* thisptr, int edx);
+	bool	FASTCALL	hkIsHLTV(IEngineClient* thisptr, int edx);
 	bool	FASTCALL	hkSendNetMsg(INetChannel* thisptr, int edx, INetMessage* pMessage, bool bForceReliable, bool bVoice);
 	int		FASTCALL	hkSendDatagram(INetChannel* thisptr, int edx, bf_write* pDatagram);
 	void	FASTCALL	hkOverrideView(IClientModeShared* thisptr, int edx, CViewSetup* pSetup);
-	void	FASTCALL	hkOverrideMouseInput(IClientModeShared* thisptr, int edx, float* x, float* y);
 	float	FASTCALL	hkGetViewModelFOV(IClientModeShared* thisptr, int edx);
 	int		FASTCALL	hkDoPostScreenEffects(IClientModeShared* thisptr, int edx, CViewSetup* pSetup);
-	void	FASTCALL	hkGetLocalViewAngles(void* ecx, void* edx, QAngle& ang);
+	void	FASTCALL	hkGetLocalViewAngles(IPrediction* thisptr, int edx, QAngle& ang);
 	void	FASTCALL	hkRunCommand(IPrediction* thisptr, int edx, CBaseEntity* pEntity, CUserCmd* pCmd, IMoveHelper* pMoveHelper);
 	int		FASTCALL	hkSendMessage(ISteamGameCoordinator* thisptr, int edx, std::uint32_t uMsgType, const void* pData, std::uint32_t uData);
 	int		FASTCALL	hkRetrieveMessage(ISteamGameCoordinator* thisptr, int edx, std::uint32_t* puMsgType, void* pDest, std::uint32_t uDest, std::uint32_t* puMsgSize);
-	bool	FASTCALL	hkSvCheatsGetBool(CConVar* thisptr, int edx);
+	void	FASTCALL	hkDoExtraBoneProcessing(void* ecx, void* edx, CStudioHdr* hdr, Vector* pos, Quaternion* q, matrix3x4_t* matrix, CBoneBitList& bone_list, CIKContext* context);
+	void	FASTCALL	hkStandardBlendingRules(void* ecx, void* edx, CStudioHdr* pStudioHdr, Vector pos[], Quaternion q[], float currentTime, int boneMask);
+	bool	FASTCALL	hksv_cheatsGetBool(CConVar* thisptr, int edx);
+	int		FASTCALL	hkr_3dskyGetInt(CConVar* thisptr, int edx);
+	bool	FASTCALL	hkcl_csm_enabledGetBool(CConVar* thisptr, int edx);
+	bool	FASTCALL	hkmat_postprocess_enableGetBool(CConVar* thisptr, int edx);
+	int		FASTCALL	hkweapon_debug_spread_showGetInt(CConVar* thisptr, int edx);
 	long	CALLBACK	hkWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 }
 

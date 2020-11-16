@@ -145,37 +145,37 @@ void T::LegitBot()
 
 	ImGui::Columns(2, nullptr, false);
 	{
-		ImGui::BeginChild(XorStr("legitbot.aimbot"), ImVec2(0, 215), true, ImGuiWindowFlags_MenuBar);
+		ImGui::BeginChild(XorStr("legitbot.triggerbot"), ImVec2(0, 215), true, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 		{
 			if (ImGui::BeginMenuBar())
 			{
-				ImGui::TextUnformatted(XorStr("aim  assistance"));
+				ImGui::TextUnformatted(XorStr("triggerbot"));
+
+				if (ImGui::BeginMenu(XorStr("hitboxes")))
+				{
+					ImGui::MenuItem(XorStr("head"), nullptr, &C::Get<bool>(Vars.bTriggerHead));
+					ImGui::MenuItem(XorStr("chest"), nullptr, &C::Get<bool>(Vars.bTriggerChest));
+					ImGui::MenuItem(XorStr("stomach"), nullptr, &C::Get<bool>(Vars.bTriggerStomach));
+					ImGui::EndMenu();
+				}
+
 				ImGui::EndMenuBar();
 			}
 
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1));
+			ImGui::Checkbox(XorStr("enable"), &C::Get<bool>(Vars.bTrigger));
+			ImGui::SliderInt(XorStr("reaction time##trigger"), &C::Get<int>(Vars.iTriggerDelay), 0, 500, "%dms");
+			ImGui::SliderInt(XorStr("minimum damage##trigger"), &C::Get<int>(Vars.iTriggerMinimumDamage), 1, 100, "%dhp");
+			ImGui::HotKey(XorStr("trigger key"), &C::Get<int>(Vars.iTriggerKey));
+			ImGui::Checkbox(XorStr("penetrate walls##trigger"), &C::Get<bool>(Vars.bTriggerAutoWall));
 
-			LegitbotVariables_t& WeaponVars = C::Get<std::vector<LegitbotVariables_t>>(Vars.vecLegitVars)[C::Get<int>(Vars.iLegitWeapon)];
-
-			ImGui::Checkbox(XorStr("master switch"), &C::Get<bool>(Vars.bLegit));
-			ImGui::Combo(XorStr("weapon config"), &C::Get<int>(Vars.iLegitWeapon), XorStr("rifles\0snipers\0pistols\0heavy pistols\0smgs\0other\0\0"));
-			ImGui::Combo(XorStr("hitbox selection"), &WeaponVars.iAimHitbox, XorStr("closest\0head\0chest\0stomach\0\0"));
-			ImGui::SliderFloat(XorStr("maximum fov##legitbot"), &WeaponVars.flAimFov, 0, 20, u8"%.1f\u00B0");
-
-			if (!WeaponVars.bAimSilent)
-				ImGui::SliderFloat(XorStr("smoothing amount##legitbot"), &WeaponVars.flAimSmooth, 1, 10, "%.1f");
-
-			ImGui::HotKey(XorStr("aim key##legitbot"), &WeaponVars.iAimKey);
-			ImGui::Checkbox(XorStr("aim at backtrack"), &WeaponVars.bAimAtBacktrack);
-			ImGui::Checkbox(XorStr("silent aim##legitbot"), &WeaponVars.bAimSilent);
-
-			if (C::Get<int>(Vars.iLegitWeapon) != (int)ELegitWeaponTypes::SNIPERS) // no rcs for snipers
-				ImGui::Checkbox(XorStr("recoil control##legitbot"), &WeaponVars.bAimRCS);
-
-			ImGui::Checkbox(XorStr("penetrate walls##legitbot"), &WeaponVars.bAimAutoWall);
-
-			if (WeaponVars.bAimAutoWall)
-				ImGui::SliderInt(XorStr("minimum damage##legitbot"), &WeaponVars.iAimAutoWallMinDamage, 0, 100, "%dhp");
+			ImGui::Checkbox(XorStr("magnetic trigger##trigger"), &C::Get<bool>(Vars.bTriggerMagnet));
+			if (C::Get<bool>(Vars.bTriggerMagnet))
+			{
+				ImGui::SliderFloat(XorStr("maximum fov##trigger"), &C::Get<float>(Vars.flTriggerMagnetFov), 0.f, 20.f, "%.1f");
+				ImGui::SliderFloat(XorStr("smoothing amount##trigger"), &C::Get<float>(Vars.flTriggerMagnetSmooth), 1.f, 10.f, "%.1f");
+				ImGui::Checkbox(XorStr("recoil control##trigger"), &C::Get<bool>(Vars.bTriggerMagnetRCS));
+			}
 
 			ImGui::PopStyleVar();
 			ImGui::EndChild();
@@ -190,7 +190,7 @@ void T::LegitBot()
 		}
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1));
 
-		ImGui::Checkbox(XorStr("backtracking##backtracking"), &C::Get<bool>(Vars.bBacktracking));
+		ImGui::Checkbox(XorStr("enable##backtracking"), &C::Get<bool>(Vars.bBacktracking));
 		if (C::Get<bool>(Vars.bBacktracking))
 			ImGui::SliderInt(XorStr("time##backtracking"), &C::Get<int>(Vars.iBacktrackingTime), 0, 200, "%dms");
 
@@ -200,33 +200,41 @@ void T::LegitBot()
 
 	ImGui::NextColumn();
 	{
-		ImGui::BeginChild(XorStr("legitbot.triggerbot"), ImVec2(), true, ImGuiWindowFlags_MenuBar);
+		ImGui::BeginChild(XorStr("legitbot.aimbot"), ImVec2(), true, ImGuiWindowFlags_MenuBar);
 		{
+
 			if (ImGui::BeginMenuBar())
 			{
-				ImGui::TextUnformatted(XorStr("triggerbot"));
-
-				if (ImGui::BeginMenu(XorStr("hitboxes")))
-				{
-					ImGui::MenuItem(XorStr("head"), nullptr, &C::Get<bool>(Vars.bTriggerHead));
-					ImGui::MenuItem(XorStr("chest"), nullptr, &C::Get<bool>(Vars.bTriggerChest));
-					ImGui::MenuItem(XorStr("stomach"), nullptr, &C::Get<bool>(Vars.bTriggerStomach));
-					ImGui::MenuItem(XorStr("arms"), nullptr, &C::Get<bool>(Vars.bTriggerArms));
-					ImGui::MenuItem(XorStr("legs"), nullptr, &C::Get<bool>(Vars.bTriggerLegs));
-					ImGui::EndMenu();
-				}
-
+				ImGui::TextUnformatted(XorStr("aim  assistance"));
 				ImGui::EndMenuBar();
 			}
 
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1));
-			ImGui::Checkbox(XorStr("enable"), &C::Get<bool>(Vars.bTrigger));
-			ImGui::HotKey(XorStr("trigger key"), &C::Get<int>(Vars.iTriggerKey));
-			ImGui::SliderInt(XorStr("reaction delay##trigger"), &C::Get<int>(Vars.iTriggerDelay), 0, 500, "%dms");
-			ImGui::SliderInt(XorStr("minimum damage##trigger"), &C::Get<int>(Vars.iTriggerMinimumDamage), 1, 100, "%dhp");
-			ImGui::Checkbox(XorStr("penetrate walls##trigger"), &C::Get<bool>(Vars.bTriggerAutoWall));
-			ImGui::PopStyleVar();
 
+			LegitbotVariables_t& WeaponVars = C::Get<std::vector<LegitbotVariables_t>>(Vars.vecLegitVars)[C::Get<int>(Vars.iLegitWeapon)];
+
+			ImGui::Checkbox(XorStr("enable##legitbot"), &C::Get<bool>(Vars.bLegit));
+			ImGui::Combo(XorStr("weapon config##legitbot"), &C::Get<int>(Vars.iLegitWeapon), XorStr("rifles\0snipers\0pistols\0heavy pistols\0smgs\0other\0\0"));
+			ImGui::Combo(XorStr("hitbox##legitbot"), &WeaponVars.iAimHitbox, XorStr("closest\0head\0chest\0stomach\0\0"));
+			ImGui::Combo(XorStr("priority hitbox##legitbot"), &WeaponVars.iAimPriorityHitbox, XorStr("none\0head\0chest\0stomach\0\0"));
+			ImGui::SliderFloat(XorStr("maximum fov##legitbot"), &WeaponVars.flAimFov, 0, 20, "%.1f");
+
+			if (!WeaponVars.bAimSilent)
+				ImGui::SliderFloat(XorStr("smoothing amount##legitbot"), &WeaponVars.flAimSmooth, 1, 10, "%.1f");
+
+			ImGui::HotKey(XorStr("aim key##legitbot"), &WeaponVars.iAimKey);
+			ImGui::Checkbox(XorStr("aim at backtrack##legitbot"), &WeaponVars.bAimAtBacktrack);
+			ImGui::Checkbox(XorStr("silent aim##legitbot"), &WeaponVars.bAimSilent);
+
+			if (C::Get<int>(Vars.iLegitWeapon) != (int)ELegitWeaponTypes::SNIPERS) // no rcs for snipers
+				ImGui::Checkbox(XorStr("recoil control##legitbot"), &WeaponVars.bAimRCS);
+
+			ImGui::Checkbox(XorStr("penetrate walls##legitbot"), &WeaponVars.bAimAutoWall);
+
+			if (WeaponVars.bAimAutoWall)
+				ImGui::SliderInt(XorStr("minimum damage##legitbot"), &WeaponVars.iAimAutoWallMinDamage, 0, 100, "%dhp");
+
+			ImGui::PopStyleVar();
 			ImGui::EndChild();
 		}
 	}
@@ -297,8 +305,9 @@ void T::Visuals()
 					{
 						ImGui::Text(XorStr("enemies"));
 						ImGui::Checkbox(XorStr("radar##player"), &C::Get<bool>(Vars.bEspMainPlayerRadar));
-						ImGui::Checkbox(XorStr("health##player"), &C::Get<bool>(Vars.bEspMainPlayerHealth));
-						ImGui::ColorCheckbox(XorStr("override health color##player"), &C::Get<bool>(Vars.bEspMainPlayerOverrideHealthColor), &C::Get<Color>(Vars.colEspMainPlayerHealth));
+						ImGui::Checkbox(XorStr("health bar##player"), &C::Get<bool>(Vars.bEspMainPlayerHealthBar));
+						ImGui::ColorCheckbox(XorStr("override health bar color##player"), &C::Get<bool>(Vars.bEspMainPlayerOverrideHealthBarColor), &C::Get<Color>(Vars.colEspMainPlayerHealthBar));
+						ImGui::ColorCheckbox(XorStr("health##player"), &C::Get<bool>(Vars.bEspMainPlayerHealth), &C::Get<Color>(Vars.colEspMainPlayerHealth));
 						ImGui::ColorCheckbox(XorStr("box##player"), &C::Get<bool>(Vars.bEspMainPlayerBox), &C::Get<Color>(Vars.colEspMainPlayerBox));
 						ImGui::ColorCheckbox(XorStr("skeleton##player"), &C::Get<bool>(Vars.bEspMainPlayerSkeleton), &C::Get<Color>(Vars.colEspMainPlayerSkeleton));
 						ImGui::ColorCheckbox(XorStr("visualize backtrack##player"), &C::Get<bool>(Vars.bEspMainPlayerBacktrack), &C::Get<Color>(Vars.colEspMainPlayerBacktrack));
@@ -308,6 +317,9 @@ void T::Visuals()
 						ImGui::ColorCheckbox(XorStr("weapon text##player"), &C::Get<bool>(Vars.bEspMainPlayerWeaponText), &C::Get<Color>(Vars.colEspMainPlayerWeaponText));
 						ImGui::ColorCheckbox(XorStr("weapon icon##player"), &C::Get<bool>(Vars.bEspMainPlayerWeaponIcon), &C::Get<Color>(Vars.colEspMainPlayerWeaponIcon));
 						ImGui::ColorCheckbox(XorStr("ammo##player"), &C::Get<bool>(Vars.bEspMainPlayerAmmo), &C::Get<Color>(Vars.colEspMainPlayerAmmo));
+						ImGui::ColorEdit3("", &C::Get<Color>(Vars.colEspMainPlayerFlags),
+							ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview | ImGuiColorEditFlags_NoTooltip);
+						ImGui::SameLine(10.f);
 						ImGui::MultiCombo(XorStr("flags##player"), arrVisualsFlags, C::Get<std::vector<bool>>(Vars.vecEspMainPlayerFlags), IM_ARRAYSIZE(arrVisualsFlags));
 
 						flEnemiesChildSize = ImGui::GetCursorPosY() + style.ItemSpacing.y;
@@ -436,8 +448,16 @@ void T::Visuals()
 					ImGui::BeginChild("chams.backtrack", ImVec2(0, flEnemiesBacktrackChildSize), true, ImGuiWindowFlags_NoTitleBar);
 					{
 						ImGui::Text(XorStr("backtrack"));
-						ImGui::Combo(XorStr("type##chamsbacktrack"), &C::Get<int>(Vars.iEspChamsBacktrackType), XorStr("all records\0last record\0\0"));
+						ImGui::Combo(XorStr("type##chamsbacktrack"), &C::Get<int>(Vars.iEspChamsBacktrackType), XorStr("last record\0all records\0all records gradient\0\0"));
 						ImGui::ColorCheckbox(XorStr("enable##chamsbacktrack"), &C::Get<bool>(Vars.bEspChamsEnemiesBacktrack), &C::Get<Color>(Vars.colEspChamsEnemiesBacktrack));
+
+						if (C::Get<int>(Vars.iEspChamsBacktrackType) == 2)
+						{
+							ImGui::SameLine();
+							ImGui::ColorEdit3(XorStr("gradient color"), &C::Get<Color>(Vars.colEspChamsEnemiesBacktrackGradient),
+								ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview | ImGuiColorEditFlags_NoTooltip);
+						}
+
 						ImGui::Combo(XorStr("material##chamsbacktrack"), &C::Get<int>(Vars.iEspChamsEnemiesBacktrack), XorStr("covered\0flat\0wireframe\0reflective\0\0"));
 						flEnemiesBacktrackChildSize = ImGui::GetCursorPosY() + style.ItemSpacing.y;
 						ImGui::EndChild();
@@ -450,11 +470,8 @@ void T::Visuals()
 					ImGui::BeginChild("chams.viewmodel", ImVec2(0, flViewmodelChildSize), true, ImGuiWindowFlags_NoTitleBar);
 					{
 						ImGui::Text(XorStr("viewmodel"));
-						ImVec4 vecViewmodelColor = { C::Get<Color>(Vars.colEspChamsViewModel).rBase(), C::Get<Color>(Vars.colEspChamsViewModel).gBase(), C::Get<Color>(Vars.colEspChamsViewModel).bBase(), C::Get<Color>(Vars.colEspChamsViewModel).aBase() };
-						if (ImGui::ColorEdit4(XorStr("color"), &vecViewmodelColor.x, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview | ImGuiColorEditFlags_NoTooltip))
-						{
-							C::Get<Color>(Vars.colEspChamsViewModel) = Color(vecViewmodelColor.x, vecViewmodelColor.y, vecViewmodelColor.z, vecViewmodelColor.w);
-						}
+						ImGui::ColorEdit3(XorStr("color"), &C::Get<Color>(Vars.colEspChamsViewModel), 
+							ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview | ImGuiColorEditFlags_NoTooltip);
 						ImGui::Combo(XorStr("viewmodel material##chams"), &C::Get<int>(Vars.iEspChamsViewModel), XorStr("no draw\0covered\0flat\0wireframe\0glow\0scroll\0chrome\0\0"));
 						flViewmodelChildSize = ImGui::GetCursorPosY() + style.ItemSpacing.y;
 						ImGui::EndChild();
@@ -481,6 +498,7 @@ void T::Visuals()
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1));
 
 			ImGui::MultiCombo(XorStr("removals"), arrVisualsRemovals, C::Get<std::vector<bool>>(Vars.vecWorldRemovals), IM_ARRAYSIZE(arrVisualsRemovals));
+			ImGui::Combo(XorStr("custom skybox"), &C::Get<int>(Vars.iWorldCustomSky), arrVisualsSkyboxes, IM_ARRAYSIZE(arrVisualsSkyboxes));
 			ImGui::HotKey(XorStr("thirdperson"), &C::Get<int>(Vars.iWorldThirdPersonKey));
 			ImGui::SliderInt(XorStr("distance"), &C::Get<int>(Vars.iWorldThirdPersonOffset), 50, 500);
 			ImGui::Checkbox(XorStr("night mode"), &C::Get<bool>(Vars.bWorldNightMode));
@@ -507,7 +525,7 @@ void T::Visuals()
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1));
 			ImGui::SliderFloat(XorStr("camera fov"), &C::Get<float>(Vars.flScreenCameraFOV), -89.f, 89.f, u8"%.1f\u00B0");
 			ImGui::SliderFloat(XorStr("viewmodel fov"), &C::Get<float>(Vars.flScreenViewModelFOV), -90.f, 90.f, u8"%.1f\u00B0");
-			ImGui::Checkbox(XorStr("spectator list"), &C::Get<bool>(Vars.bSpectatorList));
+			ImGui::Checkbox(XorStr("spectator list"), &C::Get<bool>(Vars.bScreenSpectatorList));
 			ImGui::Checkbox(XorStr("sniper crosshair"), &C::Get<bool>(Vars.bScreenSniperCrosshair));
 			ImGui::Checkbox(XorStr("hitmarker"), &C::Get<bool>(Vars.bScreenHitMarker));
 			if (C::Get<bool>(Vars.bScreenHitMarker))
@@ -572,6 +590,10 @@ void T::Miscellaneous()
 			ImGui::Checkbox(XorStr("auto accept"), &C::Get<bool>(Vars.bMiscAutoAccept));
 			ImGui::Checkbox(XorStr("auto pistol"), &C::Get<bool>(Vars.bMiscAutoPistol));
 			ImGui::HotKey(XorStr("blockbot"), &C::Get<int>(Vars.iMiscBlockBotKey));
+			if (ImGui::InputText(XorStr("custom clantag"), &C::Get<std::string>(Vars.szMiscClantag), ImGuiInputTextFlags_EnterReturnsTrue))
+				U::SendClanTag(C::Get<std::string>(Vars.szMiscClantag).c_str(), "");
+			if (ImGui::InputText(XorStr("custom name"), &C::Get<std::string>(Vars.szMiscName), ImGuiInputTextFlags_EnterReturnsTrue))
+				U::SendName(C::Get<std::string>(Vars.szMiscName).c_str());
 			//ImGui::Checkbox(XorStr("anti-untrusted"), &C::Get<bool>(Vars.bMiscAntiUntrusted));
 			ImGui::PopStyleVar();
 
@@ -684,6 +706,8 @@ void T::SkinChanger()
 {
 	ImGuiStyle& style = ImGui::GetStyle();
 
+	static CTimer timer(true);
+
 	ImGui::BeginChild(XorStr("skinchanger"), ImVec2(0, 0), true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_MenuBar);
 	{
 		if (ImGui::BeginMenuBar())
@@ -693,86 +717,88 @@ void T::SkinChanger()
 		}
 
 		ImGui::Columns(2, nullptr, false);
+
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1.f));
+
+		ImGui::PushItemWidth(106.f);
+		ImGui::Combo("##1", &C::Get<int>(Vars.iSkinchangerWeapon),
+			[](void* data, int idx, const char** out_text)
+			{
+				*out_text = arrWeaponNames[idx].second;
+				return true;
+			}, nullptr, 36, 8); int iIndex = arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first;
+
+		SkinchangerVariables_t& WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[iIndex];
+		WeaponVars.iDefinitionIndex = iIndex;
+
+		if (iIndex == WEAPON_KNIFE) // if knife is selected
 		{
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1.f));
-
-			ImGui::PushItemWidth(106.f);
-			ImGui::Combo("##1", &C::Get<int>(Vars.iSkinchangerWeapon),
+			ImGui::SameLine(125.f);
+			ImGui::Combo("##2", &C::Get<int>(Vars.iSkinchangerKnife),
 				[](void* data, int idx, const char** out_text)
 				{
-					*out_text = arrWeaponNames[idx].second;
+					*out_text = arrKnifeNames[idx].second;
 					return true;
-				}, nullptr, 36, 8); int iIndex = arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first;
-
-			SkinchangerVariables_t& WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[iIndex];
-			WeaponVars.iDefinitionIndex = iIndex;
-
-			if (iIndex == WEAPON_KNIFE) // if knife is selected
-			{
-				ImGui::SameLine(125.f);
-				ImGui::Combo("##2", &C::Get<int>(Vars.iSkinchangerKnife),
-					[](void* data, int idx, const char** out_text)
-					{
-						*out_text = arrKnifeNames[idx].second;
-						return true;
-					}, nullptr, 20, 8); WeaponVars.iDefinitionIndexOverride = arrKnifeNames[C::Get<int>(Vars.iSkinchangerKnife)].first;
-			}
-			else if (iIndex == GLOVE_T)
-			{
-				ImGui::SameLine(125.f);
-				ImGui::Combo("##2", &C::Get<int>(Vars.iSkinchangerGlove),
-					[](void* data, int idx, const char** out_text)
-					{
-						*out_text = arrGlovesNames[idx].second;
-						return true;
-					}, nullptr, 8, 8); WeaponVars.iDefinitionIndexOverride = arrGlovesNames[C::Get<int>(Vars.iSkinchangerGlove)].first;
-			}
-
-			ImGui::PopItemWidth();
-
-			ImGui::PushItemWidth(-1.f);
-
-			ImGui::ListBox("##3", &WeaponVars.iPaintKitIndex,
-				[](void* data, int idx, const char** out_text)
-				{
-					*out_text = arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first == GLOVE_T ? CSkinChanger::Get().vecGloveKits[idx].szName.data() : CSkinChanger::Get().vecSkinKits[idx].szName.data();
-					return true;
-				}, nullptr, iIndex == GLOVE_T ? CSkinChanger::Get().vecGloveKits.size() : CSkinChanger::Get().vecSkinKits.size(), 13); 
-			WeaponVars.iPaintKit = iIndex == GLOVE_T ? CSkinChanger::Get().vecGloveKits[WeaponVars.iPaintKitIndex].iId : CSkinChanger::Get().vecSkinKits[WeaponVars.iPaintKitIndex].iId;
-
-			ImGui::PopStyleVar();
+				}, nullptr, 22, 8); WeaponVars.iDefinitionIndexOverride = arrKnifeNames[C::Get<int>(Vars.iSkinchangerKnife)].first;
 		}
+		else if (iIndex == GLOVE_T) // if glove is selected
+		{
+			ImGui::SameLine(125.f);
+			ImGui::Combo("##2", &C::Get<int>(Vars.iSkinchangerGlove),
+				[](void* data, int idx, const char** out_text)
+				{
+					*out_text = arrGlovesNames[idx].second;
+					return true;
+				}, nullptr, 8, 8); WeaponVars.iDefinitionIndexOverride = arrGlovesNames[C::Get<int>(Vars.iSkinchangerGlove)].first;
+		}
+
+		ImGui::PopItemWidth();
+
+		ImGui::PushItemWidth(-1.f);
+
+		ImGui::ListBox("##3", &WeaponVars.iPaintKitIndex,
+			[](void* data, int idx, const char** out_text)
+			{
+				*out_text = arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first == GLOVE_T ? CSkinChanger::Get().vecGloveKits[idx].szName.data() : CSkinChanger::Get().vecSkinKits[idx].szName.data();
+				return true;
+			}, nullptr, iIndex == GLOVE_T ? CSkinChanger::Get().vecGloveKits.size() : CSkinChanger::Get().vecSkinKits.size(), 13); 
+		WeaponVars.iPaintKit = iIndex == GLOVE_T ? CSkinChanger::Get().vecGloveKits[WeaponVars.iPaintKitIndex].iId : CSkinChanger::Get().vecSkinKits[WeaponVars.iPaintKitIndex].iId;
+
+		ImGui::PopStyleVar();
+
 		ImGui::NextColumn();
+
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1.f));
+
+		ImGui::Checkbox(XorStr("enable"), &WeaponVars.bEnabled);
+		ImGui::SliderInt(XorStr("seed"), &WeaponVars.iSeed, 0, 1000);
+		ImGui::SliderFloat(XorStr("wear"), &WeaponVars.flWear, 0.f, 1.f, "%.5f");
+
+		if (iIndex != GLOVE_T)
 		{
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, -1.f));
+			ImGui::Checkbox(XorStr("stattrak"), &WeaponVars.bStatTrak);
+			if (WeaponVars.bStatTrak)
+				ImGui::InputInt("", &WeaponVars.iStatTrak);
 
-			SkinchangerVariables_t& WeaponVars = C::Get<std::map<int, SkinchangerVariables_t>>(Vars.mapSkinchangerVars)[arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first];
-
-			ImGui::Checkbox(XorStr("enable"), &WeaponVars.bEnabled);
-			ImGui::SliderInt(XorStr("seed"), &WeaponVars.iSeed, 0, 1000);
-			ImGui::SliderFloat(XorStr("wear"), &WeaponVars.flWear, 0.f, 1.f, "%.5f");
-
-			if (arrWeaponNames[C::Get<int>(Vars.iSkinchangerWeapon)].first != GLOVE_T)
-			{
-				ImGui::Checkbox(XorStr("stattrak"), &WeaponVars.bStatTrak);
-				if (WeaponVars.bStatTrak)
-					ImGui::InputInt("", &WeaponVars.iStatTrak);
-
-				ImGui::Checkbox(XorStr("nametag"), &WeaponVars.bNameTag);
-				if (WeaponVars.bNameTag)
-					ImGui::InputText(XorStr("text"), &WeaponVars.szNameTag);
-			}
-
-			ImGui::PopStyleVar();
+			ImGui::Checkbox(XorStr("nametag"), &WeaponVars.bNameTag);
+			if (WeaponVars.bNameTag)
+				ImGui::InputText(XorStr("text"), &WeaponVars.szNameTag);
 		}
+
+		ImGui::PopStyleVar();
 		ImGui::Columns(1);
 
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 0.5f));
 
 		ImGui::Separator();
 		if (ImGui::Button(XorStr("update"), ImVec2(-1, 0)))
-			U::ForceFullUpdate();
-
+		{
+			if (timer.Elapsed() > 2000)
+			{	
+				U::ForceFullUpdate();
+				timer.Reset();
+			}
+		}
 		ImGui::PopStyleVar();
 
 		ImGui::EndChild();
